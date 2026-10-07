@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { readPreferences } from "../../services/preferences.js";
 import {
   Minus,
   Plus,
@@ -22,17 +23,26 @@ export default function ImageViewer({
   full,
   setFull,
 }) {
-  const [mode, setMode] = useState("pair"),
+  const [mode, setMode] = useState(() => readPreferences().comparisonMode),
     [sync, setSync] = useState(true),
     [view, setView] = useState({ z: 1, x: 0, y: 0 }),
     [views, setViews] = useState({}),
     [tool, setTool] = useState("move"),
     [layer, setLayer] = useState("none"),
-    [opacity, setOpacity] = useState(0.45),
+    [opacity, setOpacity] = useState(() => readPreferences().maskOpacity),
     [split, setSplit] = useState(50),
     [coordinate, setCoordinate] = useState(null),
     [diff, setDiff] = useState(null),
     [aligned, setAligned] = useState(true);
+  useEffect(() => {
+    const apply = () => {
+      const next = readPreferences();
+      setMode(next.comparisonMode);
+      setOpacity(next.maskOpacity);
+    };
+    window.addEventListener("glads-preferences-changed", apply);
+    return () => window.removeEventListener("glads-preferences-changed", apply);
+  }, []);
   useEffect(() => {
     setLayer("none");
     setView({ z: 1, x: 0, y: 0 });
@@ -284,8 +294,8 @@ export default function ImageViewer({
           {layer === "mask"
             ? "Golden20 精确融合掩码"
             : layer === "diff"
-              ? "像素差异，不代表修复质量"
-              : "Golden20 参考图像"}
+              ? "实际像素差异"
+              : "Golden20 图像"}
         </span>
       </div>
     </section>
@@ -386,7 +396,7 @@ function Tile({
               alt={label}
             />
           ) : (
-            <div className="missing-candidate">未生成 · 交付包未提供图像</div>
+            <div className="missing-candidate">暂无候选图像</div>
           )}
           {curtain && (
             <>

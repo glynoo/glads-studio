@@ -59,7 +59,7 @@ export default function CaseNavigation({
         </div>
         <div className="file-footer">
           <FileImage size={14} />
-          {cases.length} 个真实参考案例 ·{" "}
+          {cases.length} 个案例 ·{" "}
           {cases.filter((c) => c.latestReview).length} 个已复核
         </div>
       </Panel>
@@ -96,7 +96,7 @@ export default function CaseNavigation({
           ))}
         </div>
         <p className="tiny">
-          这是本组 20 例参考案例的复核进度，不代表洞窟整体修复完成。
+          按案例查看人工复核进度。
         </p>
       </Panel>
     </aside>

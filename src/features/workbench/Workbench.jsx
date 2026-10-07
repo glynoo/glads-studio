@@ -9,17 +9,11 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
-  Check,
   Download,
-  FileImage,
-  FolderOpen,
   History,
-  Info,
-  MapPin,
   Save,
-  Search,
 } from "lucide-react";
-import { Badge, Modal, Panel } from "../../components/UI.jsx";
+import { Badge, Modal } from "../../components/UI.jsx";
 import { reviewApi } from "../../services/reviewApi.js";
 import ImageViewer from "./ImageViewer.jsx";
 
@@ -43,7 +37,13 @@ function firstAvailable(item) {
   );
 }
 
-export default function Workbench() {
+function caseFromHash() {
+  if (!location.hash.startsWith("#/workbench?")) return null;
+  const id = new URLSearchParams(location.hash.split("?")[1]).get("case");
+  return /^case_\d{4}$/.test(id || "") ? id : null;
+}
+
+export default function Workbench({ active = true }) {
   const [cases, setCases] = useState([]);
   const [caseId, setCaseId] = useState(null);
   const [item, setItem] = useState(null);
@@ -68,7 +68,8 @@ export default function Workbench() {
       .then((result) => {
         if (!live) return;
         setCases(result.items);
-        setCaseId(result.items[0]?.id || null);
+        const linked = caseFromHash();
+        setCaseId(result.items.some((entry) => entry.id === linked) ? linked : result.items[0]?.id || null);
         setLoadError("");
       })
       .catch((error) => {
@@ -81,6 +82,14 @@ export default function Workbench() {
       live = false;
     };
   }, []);
+  useEffect(() => {
+    const onHash = () => {
+      const id = caseFromHash();
+      if (id && cases.some((entry) => entry.id === id)) setCaseId(id);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, [cases]);
   useEffect(() => {
     if (!caseId) return;
     let live = true;
@@ -107,15 +116,14 @@ export default function Workbench() {
     };
   }, [caseId]);
   useEffect(() => {
-    document.body.classList.toggle("inspection-mode", full);
+    document.body.classList.toggle("inspection-mode", full && active);
     return () => document.body.classList.remove("inspection-mode");
-  }, [full]);
+  }, [full, active]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 4500);
     return () => clearTimeout(timer);
   }, [toast]);
-  const current = cases.find((entry) => entry.id === caseId);
   const selected = item?.variants?.[candidate];
   const hasRisk = !!(item?.semanticRisk || item?.riskReasons?.length);
   const notes =
@@ -149,6 +157,7 @@ export default function Workbench() {
     saveDraft(false);
     setCaseId(id);
     setFocus(null);
+    location.hash = `#/workbench?case=${id}`;
   }
   async function refreshCase(id = caseId) {
     const [detail, list] = await Promise.all([
@@ -246,7 +255,7 @@ export default function Workbench() {
           <div className="breadcrumb">GLADS Restore / Golden20 / {item.id}</div>
           <div className="title-line">
             <h1>
-              修复工作台<span>Reference review</span>
+              修复工作台<span>Case review</span>
             </h1>
             <Badge tone={hasRisk ? "warning" : ""}>{statusLabel(item)}</Badge>
           </div>
@@ -254,21 +263,17 @@ export default function Workbench() {
         <div className="task-actions">
           <span className="demo-label">
             <span />
-            参考结果复核
+            人工复核
           </span>
           <button onClick={() => setModal({ type: "history" })}>
             <History size={15} />
             复核历史 <span className="count">{item.reviews.length}</span>
           </button>
           <button onClick={() => setModal({ type: "source" })}>
-            Golden20 · Big-LaMa 参考
+            来源与版本
           </button>
           {full && <button onClick={() => setDrawer(!drawer)}>判断依据</button>}
         </div>
-      </div>
-      <div className="reference-banner">
-        <Info size={15} /> 当前候选来自交付包 Golden20，是 Big-LaMa
-        参考结果；本系统未运行新图修复算法。所有案例均需人工视觉判断。
       </div>
       <div className="workbench-grid">
         <CaseNavigation
@@ -436,7 +441,7 @@ export default function Workbench() {
                 </div>
                 <div>
                   <dt>来源</dt>
-                  <dd>Golden20 / Big-LaMa 参考候选</dd>
+                <dd>Golden20 / Big-LaMa</dd>
                 </div>
                 <div>
                   <dt>候选</dt>
@@ -462,7 +467,7 @@ export default function Workbench() {
                 </div>
               </dl>
               <p className="quiet-note">
-                人工采纳仅针对当前参考候选，不表示学生模型已验收或历史原貌得到确认。
+                结论绑定当前案例与候选版本；历史记录会继续保留。
               </p>
               <div className="modal-actions">
                 <button onClick={() => setModal(null)}>继续检查</button>
@@ -479,16 +484,15 @@ export default function Workbench() {
           {modal.type === "source" && (
             <>
               <p className="modal-caption">
-                GLADS v1.0 · 20260810 / 03 Golden20 Reference
+                GLADS v1.0 · Golden20
               </p>
               <div className="source-images">
                 <img src={item.assets.original} alt="原图" />
                 <img src={item.assets.maskOverlay} alt="融合掩码标记图" />
               </div>
               <p>
-                本案例提供精确二值融合掩码、原图与参考候选。R3、R7、R12
-                是不同边界上下文的候选；第 6、9 例没有 R12 结果。候选由参考
-                Big-LaMa 生成，不是学生自训模型输出。
+                本案例包含原图、精确二值融合掩码与不同边界上下文的候选。
+                处理来源：Big-LaMa。
               </p>
               <ol className="source-chain">
                 <li>
@@ -496,7 +500,7 @@ export default function Workbench() {
                   <span>原图 / 640 × 640</span>
                 </li>
                 <li>
-                  融合执行掩码<span>独立精确掩码已随交付包提供</span>
+                  融合执行掩码<span>已关联当前案例</span>
                 </li>
                 <li>
                   R3 / R7 / R12<span>有图的候选可比较；缺失项明确标注</span>

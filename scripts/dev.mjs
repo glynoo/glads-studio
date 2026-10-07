@@ -3,17 +3,22 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const python = process.env.GLADS_PYTHON || "python3";
+const webPort = process.env.GLADS_WEB_PORT || "5173";
 const children = [
   spawn(python, ["server/app.py"], {
     cwd: root,
     stdio: "inherit",
     env: process.env,
   }),
-  spawn(resolve(root, "node_modules/.bin/vite"), ["--host", "127.0.0.1"], {
-    cwd: root,
-    stdio: "inherit",
-    env: process.env,
-  }),
+  spawn(
+    resolve(root, "node_modules/.bin/vite"),
+    ["--host", "127.0.0.1", "--port", webPort, "--strictPort"],
+    {
+      cwd: root,
+      stdio: "inherit",
+      env: process.env,
+    },
+  ),
 ];
 let ending = false;
 function stop(code = 0) {

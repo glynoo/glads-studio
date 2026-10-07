@@ -33,7 +33,7 @@ export default function CaseContext({ item, candidate, selected, setModal }) {
       <dl>
         <div>
           <dt>来源</dt>
-          <dd>Golden20 · 参考结果</dd>
+          <dd>Golden20 · Big-LaMa</dd>
         </div>
         <div>
           <dt>图像尺寸</dt>
@@ -54,7 +54,7 @@ export default function CaseContext({ item, candidate, selected, setModal }) {
         </div>
       </dl>
       <p className="context-note">
-        来源与候选哈希由交付包清单提供。参考结果不代表历史原貌。
+        候选哈希与图像来源已关联至当前案例。
       </p>
     </Panel>
   );

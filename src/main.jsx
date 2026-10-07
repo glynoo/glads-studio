@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { Layers, ChevronDown } from "lucide-react";
+import { Layers } from "lucide-react";
 import Workbench from "./features/workbench/Workbench.jsx";
-import Placeholder from "./pages/Placeholder.jsx";
+import HomePage from "./pages/HomePage.jsx";
+import AssetsPage from "./pages/AssetsPage.jsx";
+import ReviewPage from "./pages/ReviewPage.jsx";
+import SettingsPage from "./pages/SettingsPage.jsx";
 import "./styles.css";
+import "./pages/pages.css";
 const routes = {
   home: "首页",
   assets: "素材池",
@@ -13,7 +17,7 @@ const routes = {
 };
 function App() {
   const readRoute = () => {
-    const key = location.hash.slice(2);
+    const key = location.hash.slice(2).split("?")[0];
     return routes[key] ? key : "workbench";
   };
   const [page, setPage] = useState(readRoute);
@@ -49,16 +53,19 @@ function App() {
           ))}
         </nav>
         <div className="user-chip">
-          <span className="avatar">研</span>
+          <span className="avatar">G</span>
           <div>
-            项目研究组<small>Golden20 复核</small>
+            Golden20 项目<small>案例复核</small>
           </div>
         </div>
       </header>
       <div hidden={page !== "workbench"}>
-        <Workbench />
+        <Workbench active={page === "workbench"} />
       </div>
-      {page !== "workbench" && <Placeholder title={routes[page]} />}
+      {page === "home" && <HomePage />}
+      {page === "assets" && <AssetsPage />}
+      {page === "review" && <ReviewPage />}
+      {page === "settings" && <SettingsPage />}
     </>
   );
 }

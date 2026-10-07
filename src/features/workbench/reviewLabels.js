@@ -1,5 +1,5 @@
 export const decisionLabels = {
-  approve: "人工采纳参考候选",
+  approve: "采纳候选",
   reject: "拒绝候选",
   secondary_repair_required: "需要二次修复",
   defer_expert: "转专家复核",
