@@ -1,0 +1,36 @@
+async function request(path, options = {}) {
+  let response;
+  try {
+    response = await fetch(path, {
+      ...options,
+      headers: { "Content-Type": "application/json", ...options.headers },
+    });
+  } catch {
+    throw new Error("无法连接本地复核服务。请从项目目录运行 npm run dev。");
+  }
+  let body;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error(`服务响应无法读取（${response.status}）`);
+  }
+  if (!response.ok)
+    throw new Error(body.error || `服务请求失败（${response.status}）`);
+  return body;
+}
+export const reviewApi = {
+  health: () => request("/api/health"),
+  listCases: () => request("/api/cases"),
+  getCase: (id) => request(`/api/cases/${encodeURIComponent(id)}`),
+  addAnnotation: (id, value) =>
+    request(`/api/cases/${encodeURIComponent(id)}/annotations`, {
+      method: "POST",
+      body: JSON.stringify(value),
+    }),
+  addReview: (id, value) =>
+    request(`/api/cases/${encodeURIComponent(id)}/reviews`, {
+      method: "POST",
+      body: JSON.stringify(value),
+    }),
+  exportUrl: "/api/export.zip",
+};

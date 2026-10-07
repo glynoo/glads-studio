@@ -1,0 +1,24 @@
+{
+  "name": "glads-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "npm run test:api",
+    "dev:web": "vite --host 127.0.0.1",
+    "dev:api": "python3 server/app.py",
+    "test:api": "python3 -m unittest discover -s server -p \"test_*.py\""
+  },
+  "dependencies": {
+    "lucide-react": "0.468.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9",
+    "vite": "6.4.1"
+  }
+}
