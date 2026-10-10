@@ -4,7 +4,7 @@
 
 ## 运行
 
-需要 Node.js 20.19+、Python 3.9+，以及同级目录 `GLADS_v1.0交付包/GLADS-03-Golden20-Reference-v1.0_20260810.zip`。无需 GPU 或模型服务。
+需要 Node.js 20.19+、Python 3.9+，以及同级目录 `GLADS_v1.0交付包/GLADS-03-Golden20-Reference-v1.0_20260810.zip`。
 
 ```sh
 cd glads-workbench
@@ -29,10 +29,6 @@ npm run dev
 - 导出：ZIP 包含 `reviews.csv`、`annotations.csv`、`case_index.json` 和来源说明。图片仍由校验过的原始交付包保存。
 
 账号、登录会话、素材索引与人工记录存于 `data/reviews.sqlite3`；上传图片存于 `data/uploads/`；未提交的表单暂存于当前浏览器。备份时请同时保存数据库和上传目录。服务默认只监听本机。
-
-## 数据来源
-
-Golden20 候选来自交付包中的 Big-LaMa **参考结果**；人工 `approve` 记录的是对对应候选的视觉判断。新上传图片作为素材保存，包含来源信息与文件校验值。
 
 ## 协作结构
 
