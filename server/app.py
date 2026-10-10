@@ -141,7 +141,9 @@ def init_db():
             size INTEGER NOT NULL, sha256 TEXT NOT NULL, cave TEXT NOT NULL,
             mural TEXT NOT NULL, source TEXT NOT NULL, note TEXT NOT NULL,
             uploaded_by INTEGER NOT NULL, created_at TEXT NOT NULL,
-            storage_name TEXT NOT NULL, FOREIGN KEY(uploaded_by) REFERENCES users(id)
+            storage_name TEXT NOT NULL, parent_id TEXT,
+            FOREIGN KEY(uploaded_by) REFERENCES users(id),
+            FOREIGN KEY(parent_id) REFERENCES uploads(id)
         );
         CREATE TABLE IF NOT EXISTS annotations (
             id INTEGER PRIMARY KEY AUTOINCREMENT, case_id TEXT NOT NULL, candidate TEXT NOT NULL,
@@ -162,6 +164,7 @@ def init_db():
             ("annotations", "reviewer_user_id", "INTEGER"),
             ("review_events", "candidate_sha256", "TEXT"),
             ("review_events", "reviewer_user_id", "INTEGER"),
+            ("uploads", "parent_id", "TEXT"),
         ):
             existing = {row["name"] for row in con.execute(f"PRAGMA table_info({table})")}
             if column not in existing:
@@ -206,6 +209,38 @@ def login_user(payload):
     if not hmac.compare_digest(digest, row["password_hash"]):
         raise ValueError("邮箱或密码不正确")
     return public_user(row)
+
+
+def update_profile(user, payload):
+    name = str(payload.get("displayName", "")).strip()
+    if not 2 <= len(name) <= 80:
+        raise ValueError("显示名称须为 2 至 80 个字符")
+    with DB_LOCK, connection() as con:
+        con.execute("UPDATE users SET display_name=? WHERE id=?", (name, user["id"]))
+        row = con.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+    return public_user(row)
+
+
+def change_password(user, payload):
+    current = payload.get("currentPassword")
+    replacement = payload.get("newPassword")
+    if not isinstance(current, str) or not isinstance(replacement, str) or not 8 <= len(replacement) <= 128:
+        raise ValueError("新密码须为 8 至 128 个字符")
+    with DB_LOCK, connection() as con:
+        row = con.execute("SELECT password_salt,password_hash FROM users WHERE id=?", (user["id"],)).fetchone()
+        current_hash = hashlib.pbkdf2_hmac("sha256", current.encode("utf-8"), row["password_salt"], 260000)
+        if not hmac.compare_digest(current_hash, row["password_hash"]):
+            raise ValueError("当前密码不正确")
+        salt = secrets.token_bytes(16)
+        digest = hashlib.pbkdf2_hmac("sha256", replacement.encode("utf-8"), salt, 260000)
+        con.execute("UPDATE users SET password_salt=?,password_hash=? WHERE id=?", (salt, digest, user["id"]))
+
+
+def account_activity(user):
+    with connection() as con:
+        rows = con.execute("""SELECT case_id,candidate,decision,created_at FROM review_events
+                              WHERE reviewer_user_id=? ORDER BY id DESC LIMIT 8""", (user["id"],)).fetchall()
+    return [dict(row) for row in rows]
 
 
 def new_session(user_id):
@@ -261,10 +296,21 @@ def save_upload(user, fields, filename, blob):
         raise ValueError("图片大小须在 20 MB 以内")
     mime, suffix = image_type(blob)
     filename = Path(str(filename or "image").replace("\\", "/")).name[:180]
-    values = {key: str(fields.get(key, "")).strip() for key in ("cave", "mural", "source", "note")}
+    values = {key: str(fields.get(key, "")).strip() for key in ("cave", "mural", "source", "note", "parentId")}
+    parent_id = values["parentId"] or None
+    if parent_id:
+        if not UPLOAD_ID.fullmatch(parent_id):
+            raise ValueError("关联图片不存在")
+        with connection() as con:
+            parent = con.execute("SELECT cave,mural,source,parent_id FROM uploads WHERE id=?", (parent_id,)).fetchone()
+        if not parent or parent["parent_id"]:
+            raise ValueError("关联图片不存在")
+        values["cave"], values["mural"] = parent["cave"], parent["mural"]
+        if not values["source"]:
+            values["source"] = parent["source"]
     if not values["cave"] or not values["mural"] or not values["source"]:
         raise ValueError("请填写洞窟、壁画位置和图像来源")
-    if any(len(value) > limit for value, limit in zip(values.values(), (100, 100, 300, 1000))):
+    if any(len(values[key]) > limit for key, limit in (("cave", 100), ("mural", 100), ("source", 300), ("note", 1000))):
         raise ValueError("素材信息过长")
     asset_id = "upload_" + uuid.uuid4().hex
     storage_name = asset_id + suffix
@@ -277,10 +323,10 @@ def save_upload(user, fields, filename, blob):
     digest = hashlib.sha256(blob).hexdigest()
     try:
         with DB_LOCK, connection() as con:
-            con.execute("""INSERT INTO uploads(id,filename,mime,size,sha256,cave,mural,source,note,uploaded_by,created_at,storage_name)
-                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+            con.execute("""INSERT INTO uploads(id,filename,mime,size,sha256,cave,mural,source,note,uploaded_by,created_at,storage_name,parent_id)
+                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                         (asset_id, filename, mime, len(blob), digest, values["cave"], values["mural"],
-                         values["source"], values["note"], user["id"], now, storage_name))
+                         values["source"], values["note"], user["id"], now, storage_name, parent_id))
     except Exception:
         path.unlink(missing_ok=True)
         raise
@@ -292,6 +338,7 @@ def upload_dict(row):
         "id": row["id"], "filename": row["filename"], "mime": row["mime"], "size": row["size"],
         "sha256": row["sha256"], "cave": row["cave"], "mural": row["mural"], "source": row["source"],
         "note": row["note"], "uploadedAt": row["created_at"], "uploadedBy": row["display_name"],
+        "parentId": row["parent_id"],
         "imageUrl": f"/api/uploads/{row['id']}/image",
     }
 
@@ -421,7 +468,7 @@ class Handler(BaseHTTPRequestHandler):
             if name == "file":
                 filename = part.get_filename()
                 blob = data
-            elif name in {"cave", "mural", "source", "note"} and data is not None:
+            elif name in {"cave", "mural", "source", "note", "parentId"} and data is not None:
                 fields[name] = data.decode("utf-8", errors="replace")
         if blob is None:
             raise ValueError("请选择要上传的图片")
@@ -433,8 +480,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.json(200, {"ok": True, "source": "Golden20 Big-LaMa reference", "algorithmAvailable": False, "cases": len(self.catalog.cases)})
         if path == "/api/auth/me":
             return self.json(200, {"user": self.current_user()})
-        if not self.current_user():
+        user = self.current_user()
+        if not user:
             return self.json(401, {"error": "请先登录"})
+        if path == "/api/auth/activity":
+            return self.json(200, {"items": account_activity(user)})
         if path == "/api/uploads":
             return self.json(200, {"items": list_uploads()})
         upload_match = re.fullmatch(r"/api/uploads/(upload_[0-9a-f]{32})/image", path)
@@ -534,6 +584,15 @@ class Handler(BaseHTTPRequestHandler):
         user = self.current_user()
         if not user:
             return self.json(401, {"error": "请先登录"})
+        if path in {"/api/auth/profile", "/api/auth/password"}:
+            try:
+                payload = self.body()
+                if path.endswith("profile"):
+                    return self.json(200, {"user": update_profile(user, payload)})
+                change_password(user, payload)
+                return self.json(200, {"ok": True})
+            except (ValueError, json.JSONDecodeError) as error:
+                return self.json(400, {"error": str(error)})
         if path == "/api/uploads":
             try:
                 fields, filename, blob = self.multipart()

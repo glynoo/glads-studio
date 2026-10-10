@@ -97,7 +97,7 @@ function App() {
       {page === "home" && <HomePage />}
       {page === "assets" && <AssetsPage />}
       {page === "review" && <ReviewPage />}
-      {page === "settings" && <SettingsPage user={user} />}
+      {page === "settings" && <SettingsPage user={user} onUserChanged={setUser} />}
     </>
   );
 }

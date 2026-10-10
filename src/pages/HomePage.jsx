@@ -6,7 +6,7 @@ import {
   FileImage,
   ScanEye,
 } from "lucide-react";
-import { decisionLabels } from "../features/workbench/reviewLabels.js";
+import { decisionLabels, riskLabels } from "../features/workbench/reviewLabels.js";
 import { useCases } from "./useCases.js";
 import { CaseAnchor, DataState, humanTime, PageFrame } from "./PageParts.jsx";
 
@@ -45,6 +45,32 @@ export default function HomePage() {
       b.latestReview.created_at.localeCompare(a.latestReview.created_at),
     )
     .slice(0, 4);
+  const decisions = [
+    ["approve", "已采纳", "#637e62"],
+    ["secondary_repair_required", "二次处理", "#ca8c52"],
+    ["defer_expert", "转专家", "#a68b58"],
+    ["reject", "已驳回", "#ad665a"],
+    ["unreviewed", "待判断", "#d1c5b3"],
+  ].map(([key, label, color]) => ({
+    key, label, color,
+    count: cases.filter((item) => key === "unreviewed" ? !item.latestReview : item.latestReview?.decision === key).length,
+  }));
+  const candidateCoverage = ["R3", "R7", "R12"].map((key) => ({
+    key, count: cases.filter((item) => item.variants[key]?.image).length,
+  }));
+  const completeCandidates = cases.filter((item) => ["R3", "R7", "R12"].every((key) => item.variants[key]?.image)).length;
+  const riskCounts = Object.entries(risk.reduce((acc, item) => {
+    const reasons = item.riskReasons.length ? item.riskReasons : ["semantic_risk"];
+    reasons.forEach((reason) => { acc[reason] = (acc[reason] || 0) + 1; });
+    return acc;
+  }, {})).sort((a, b) => b[1] - a[1]);
+  let colorStart = 0;
+  const decisionRing = decisions.map((item) => {
+    const stop = colorStart + (cases.length ? item.count / cases.length * 100 : 0);
+    const segment = `${item.color} ${colorStart}% ${stop}%`;
+    colorStart = stop;
+    return segment;
+  }).join(", ");
 
   return (
     <PageFrame
@@ -112,6 +138,27 @@ export default function HomePage() {
             <strong>{generated}</strong>
             <small>可供查看与比较的结果</small>
           </a>
+        </div>
+        <div className="home-dashboard-grid">
+          <section className="content-card home-dashboard-panel">
+            <div className="content-head"><div><span className="eyebrow">REVIEW / 状态</span><h2>复核进度分布</h2></div><a href="#/review">查看记录 <ArrowRight size={14} /></a></div>
+            <div className="home-decision-chart">
+              <div className="home-donut" style={{ background: `conic-gradient(${decisionRing})` }}><div><strong>{recorded.length}</strong><span>已有判断</span></div></div>
+              <div className="home-chart-legend">{decisions.map((entry) => <div key={entry.key}><i style={{ background: entry.color }} /><span>{entry.label}</span><strong>{entry.count}</strong></div>)}</div>
+            </div>
+          </section>
+          <section className="content-card home-dashboard-panel">
+            <div className="content-head"><div><span className="eyebrow">CANDIDATES / 图像</span><h2>候选图像覆盖</h2></div></div>
+            <p className="home-dashboard-caption"><strong>{completeCandidates}</strong> / {cases.length} 个案例有完整三组候选</p>
+            <div className="home-coverage-bars">{candidateCoverage.map((entry) => <div key={entry.key}><span>{entry.key}</span><div><i style={{ width: `${cases.length ? entry.count / cases.length * 100 : 0}%` }} /></div><strong>{entry.count}/{cases.length}</strong></div>)}</div>
+            <a className="home-dashboard-link" href="#/assets">查看图像资料 <ArrowRight size={14} /></a>
+          </section>
+          <section className="content-card home-dashboard-panel">
+            <div className="content-head"><div><span className="eyebrow">RISK / 提示</span><h2>需要关注的证据</h2></div></div>
+            <p className="home-dashboard-caption"><strong>{risk.length}</strong> 个案例带有风险提示</p>
+            <div className="home-risk-list">{riskCounts.slice(0, 4).map(([key, count]) => <div key={key}><span>{riskLabels[key] || (key === "semantic_risk" ? "语义结构风险" : key)}</span><strong>{count}</strong></div>)}</div>
+            <a className="home-dashboard-link" href="#/review?filter=risk">查看风险案例 <ArrowRight size={14} /></a>
+          </section>
         </div>
         <div className="home-columns">
           <section className="content-card">

@@ -27,5 +27,12 @@ export function useCases() {
     };
   }, []);
 
-  return { cases, loading, error };
+  async function refresh() {
+    const { items } = await reviewApi.listCases();
+    setCases(items);
+    setError("");
+    return items;
+  }
+
+  return { cases, loading, error, refresh };
 }

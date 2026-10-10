@@ -27,4 +27,11 @@ export const authApi = {
       body: JSON.stringify({ displayName, email, password }),
     }),
   logout: () => authRequest("/api/auth/logout", { method: "POST" }),
+  updateProfile: (displayName) => authRequest("/api/auth/profile", {
+    method: "POST", body: JSON.stringify({ displayName }),
+  }),
+  changePassword: (currentPassword, newPassword) => authRequest("/api/auth/password", {
+    method: "POST", body: JSON.stringify({ currentPassword, newPassword }),
+  }),
+  activity: () => authRequest("/api/auth/activity"),
 };

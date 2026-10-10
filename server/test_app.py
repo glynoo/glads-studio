@@ -47,10 +47,24 @@ class ReviewApiTest(unittest.TestCase):
         self.assertEqual(item["mime"], "image/png")
         self.assertEqual(app.list_uploads()[0]["id"], item["id"])
         self.assertEqual((app.UPLOAD_DIR / (item["id"] + ".png")).read_bytes(), image)
+        slice_item = app.save_upload(user, {"parentId": item["id"], "note": "切片"}, "slice.png", image)
+        self.assertEqual(slice_item["parentId"], item["id"])
+        self.assertEqual(slice_item["cave"], item["cave"])
+        with self.assertRaises(ValueError):
+            app.save_upload(user, {"parentId": slice_item["id"]}, "nested.png", image)
         with self.assertRaises(ValueError):
             app.save_upload(user, fields, "bad.png", b"not an image")
         with self.assertRaises(ValueError):
             app.save_upload(user, {**fields, "source": ""}, "mural.png", image)
+
+    def test_account_profile_and_password_change(self):
+        user = app.register_user({"displayName": "原名称", "email": "profile@example.com", "password": "original-pass-123"})
+        updated = app.update_profile(user, {"displayName": "新名称"})
+        self.assertEqual(updated["displayName"], "新名称")
+        with self.assertRaises(ValueError):
+            app.change_password(user, {"currentPassword": "incorrect", "newPassword": "changed-pass-123"})
+        app.change_password(user, {"currentPassword": "original-pass-123", "newPassword": "changed-pass-123"})
+        self.assertEqual(app.login_user({"email": user["email"], "password": "changed-pass-123"})["id"], user["id"])
 
     def test_catalog_has_real_cases_and_marks_missing_images(self):
         self.assertEqual(len(self.catalog.cases), 20)

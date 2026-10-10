@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ArrowRight, FileImage, Filter, Layers3, Search, Upload } from "lucide-react";
+import { FileImage, Filter, Layers3, Search, Upload } from "lucide-react";
 import { useCases } from "./useCases.js";
 import { CaseAnchor, DataState, PageFrame } from "./PageParts.jsx";
 import UploadedAssets from "./UploadedAssets.jsx";
+import { AssetHierarchyTree, referenceHierarchy } from "./AssetHierarchyTree.jsx";
 
 const TYPES = ["全部", "原图", "掩码", "候选"];
 
@@ -50,6 +51,7 @@ export default function AssetsPage() {
     [cases, query],
   );
   const item = filtered.find((entry) => entry.id === selectedId) || filtered[0];
+  const hierarchy = useMemo(() => referenceHierarchy(filtered), [filtered]);
   const visibleAssets = item
     ? assetsFor(item).filter((asset) => type === "全部" || asset.type === type)
     : [];
@@ -76,8 +78,8 @@ export default function AssetsPage() {
           <aside className="content-card asset-browser">
             <div className="content-head">
               <div>
-                <span className="eyebrow">COLLECTION / 案例索引</span>
-                <h2>Golden20</h2>
+                <span className="eyebrow">COLLECTION / 空间索引</span>
+                <h2>洞窟 / 区域 / 图片 / 切片</h2>
               </div>
               <span className="soft-count">
                 {filtered.length} / {cases.length}
@@ -92,33 +94,14 @@ export default function AssetsPage() {
                 aria-label="搜索素材"
               />
             </label>
-            <div className="asset-case-list">
-              {filtered.map((entry) => (
-                <button
-                  key={entry.id}
-                  className={`asset-case ${entry.id === item?.id ? "selected" : ""}`}
-                  aria-pressed={entry.id === item?.id}
-                  onClick={() => setSelectedId(entry.id)}
-                >
-                  <img src={entry.assets.original} alt="" loading="lazy" />
-                  <span>
-                    <strong>{entry.id}</strong>
-                    <small>{entry.imageName}</small>
-                  </span>
-                  <ArrowRight size={15} />
-                </button>
-              ))}
-              {!filtered.length && (
-                <p className="quiet-empty">没有符合条件的案例。</p>
-              )}
-            </div>
+            {filtered.length ? <AssetHierarchyTree nodes={hierarchy} selectedId={item?.id} onSelect={setSelectedId} /> : <p className="quiet-empty">没有符合条件的案例。</p>}
           </aside>
           <section className="asset-detail">
             {item ? (
               <>
                 <div className="asset-detail-head">
                   <div>
-                    <div className="eyebrow">CASE / {item.id}</div>
+                    <div className="eyebrow">洞窟资料 / 参考区域 / 来源图像 / {item.id}</div>
                     <h2>{item.imageName}</h2>
                     <p>当前案例的图像证据与候选关系</p>
                   </div>

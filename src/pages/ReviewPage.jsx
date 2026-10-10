@@ -1,306 +1,122 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Download, Search } from "lucide-react";
-import {
-  decisionLabels,
-  riskLabels,
-} from "../features/workbench/reviewLabels.js";
+import { ArrowRight, Download, Search } from "lucide-react";
+import { decisionLabels, riskLabels } from "../features/workbench/reviewLabels.js";
 import { reviewApi } from "../services/reviewApi.js";
 import { useCases } from "./useCases.js";
 import { CaseAnchor, DataState, humanTime, PageFrame } from "./PageParts.jsx";
+import "./review-redesign.css";
 
-const FILTERS = [
-  ["all", "全部"],
-  ["pending", "待处理"],
-  ["recorded", "已有判断"],
-  ["risk", "风险案例"],
-];
+const FILTERS = [["all", "全部"], ["pending", "待处理"], ["recorded", "已有判断"], ["risk", "风险案例"]];
 const hasRisk = (item) => !!(item.semanticRisk || item.riskReasons.length);
-const pending = (item) =>
-  !item.latestReview ||
-  ["reject", "defer_expert", "secondary_repair_required"].includes(
-    item.latestReview.decision,
-  );
+const pending = (item) => !item.latestReview || ["reject", "defer_expert", "secondary_repair_required"].includes(item.latestReview.decision);
 function initialFilter() {
-  const key = new URLSearchParams(location.hash.split("?")[1] || "").get(
-    "filter",
-  );
+  const key = new URLSearchParams(location.hash.split("?")[1] || "").get("filter");
   return FILTERS.some(([value]) => value === key) ? key : "all";
 }
 
 export default function ReviewPage() {
-  const { cases, loading, error } = useCases();
+  const { cases, loading, error, refresh } = useCases();
   const [filter, setFilter] = useState(initialFilter);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailError, setDetailError] = useState("");
-  const visible = useMemo(
-    () =>
-      cases.filter((item) => {
-        const match =
-          filter === "all" ||
-          (filter === "pending" && pending(item)) ||
-          (filter === "recorded" && !!item.latestReview) ||
-          (filter === "risk" && hasRisk(item));
-        return (
-          match &&
-          `${item.id} ${item.imageName} ${item.latestReview?.reviewer || ""}`
-            .toLowerCase()
-            .includes(query.trim().toLowerCase())
-        );
-      }),
-    [cases, filter, query],
-  );
+  const [candidate, setCandidate] = useState("R3");
+  const [decision, setDecision] = useState("");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const visible = useMemo(() => cases.filter((item) => {
+    const matchesFilter = filter === "all" || (filter === "pending" && pending(item)) ||
+      (filter === "recorded" && !!item.latestReview) || (filter === "risk" && hasRisk(item));
+    return matchesFilter && `${item.id} ${item.imageName} ${item.latestReview?.reviewer || ""}`.toLowerCase().includes(query.trim().toLowerCase());
+  }), [cases, filter, query]);
   const selected = visible.find((item) => item.id === selectedId) || visible[0];
-
-  useEffect(() => {
-    if (!selected) {
-      setDetail(null);
-      return;
-    }
-    let live = true;
-    setDetail(null);
-    setDetailError("");
-    reviewApi
-      .getCase(selected.id)
-      .then((result) => {
-        if (live) setDetail(result);
-      })
-      .catch((reason) => {
-        if (live) setDetailError(reason.message);
-      });
-    return () => {
-      live = false;
-    };
-  }, [selected?.id]);
-
   const counts = {
     all: cases.length,
     pending: cases.filter(pending).length,
     recorded: cases.filter((item) => item.latestReview).length,
     risk: cases.filter(hasRisk).length,
+    approved: cases.filter((item) => item.latestReview?.decision === "approve").length,
+    secondary: cases.filter((item) => item.latestReview?.decision === "secondary_repair_required").length,
   };
-  const latest = detail?.reviews.at(-1);
-  const previewCandidate =
-    latest?.candidate && detail?.variants[latest.candidate]?.image
-      ? latest.candidate
-      : ["R3", "R7", "R12"].find((key) => detail?.variants[key]?.image);
-  const resultImage =
-    previewCandidate && detail?.variants[previewCandidate]?.image;
 
+  useEffect(() => {
+    if (!selected) { setDetail(null); return; }
+    let live = true;
+    setDetail(null); setDetailError(""); setMessage(""); setDecision(""); setNotes("");
+    reviewApi.getCase(selected.id).then((result) => {
+      if (!live) return;
+      setDetail(result);
+      const latestCandidate = result.reviews.at(-1)?.candidate;
+      setCandidate(latestCandidate && result.variants[latestCandidate]?.image
+        ? latestCandidate : ["R3", "R7", "R12"].find((key) => result.variants[key]?.image) || "R3");
+    }).catch((reason) => { if (live) setDetailError(reason.message); });
+    return () => { live = false; };
+  }, [selected?.id]);
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!selected || !candidate || !decision || !notes.trim()) return;
+    setBusy(true); setMessage("");
+    try {
+      await reviewApi.addReview(selected.id, { candidate, decision, notes: notes.trim() });
+      const [nextDetail] = await Promise.all([reviewApi.getCase(selected.id), refresh()]);
+      setDetail(nextDetail); setDecision(""); setNotes(""); setMessage("判断已记录");
+    } catch (reason) { setMessage(reason.message); }
+    finally { setBusy(false); }
+  }
+
+  const latest = detail?.reviews.at(-1);
+  const selectedCandidate = detail?.variants[candidate];
   return (
-    <PageFrame
-      eyebrow="质量与记录"
-      title="复核记录"
-      subtitle="按案例查看风险、判断理由和留存的复核历史。"
-      className="page-review"
-      actions={
-        <a className="inner-primary-link" href={reviewApi.exportUrl} download>
-          <Download size={16} /> 导出复核记录
-        </a>
-      }
-    >
+    <PageFrame eyebrow="图像证据与判断" title="人工复核" subtitle="对照原图和修复候选，记录选择依据并回看历史。" className="page-review review-redesign"
+      actions={<a className="inner-primary-link" href={reviewApi.exportUrl} download><Download size={16} /> 导出复核记录</a>}>
       <DataState loading={loading} error={error}>
-        <div className="review-filter-row">
-          <div className="pill-tabs">
-            {FILTERS.map(([key, label]) => (
-              <button
-                key={key}
-                className={filter === key ? "active" : ""}
-                onClick={() => setFilter(key)}
-              >
-                {label}
-                <span>{counts[key]}</span>
-              </button>
-            ))}
-          </div>
-          <label className="inline-search">
-            <Search size={16} />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索案例或复核人"
-              aria-label="搜索复核记录"
-            />
-          </label>
+        <div className="review-stat-ribbon">
+          <div><strong>{counts.all}</strong><span>案例总数</span></div>
+          <div><strong>{counts.pending}</strong><span>待处理</span></div>
+          <div><strong>{counts.approved}</strong><span>已采纳</span></div>
+          <div><strong>{counts.secondary}</strong><span>二次处理</span></div>
+          <div className="review-stat-progress"><span>已有人工判断</span><strong>{counts.recorded} / {counts.all}</strong><i><b style={{ width: `${counts.all ? counts.recorded / counts.all * 100 : 0}%` }} /></i></div>
         </div>
-        <div className="review-layout">
-          <section className="content-card review-table-card">
-            <div className="content-head">
-              <div>
-                <span className="eyebrow">CASE QUEUE / 案例队列</span>
-                <h2>{FILTERS.find(([key]) => key === filter)?.[1]}</h2>
-              </div>
-              <span className="soft-count">{visible.length} 项</span>
-            </div>
-            <div className="table-scroll">
-              <table className="review-table">
-                <thead>
-                  <tr>
-                    <th>案例</th>
-                    <th>风险</th>
-                    <th>当前判断</th>
-                    <th>复核人</th>
-                    <th>时间</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visible.map((item) => (
-                    <tr
-                      key={item.id}
-                      className={item.id === selected?.id ? "selected" : ""}
-                      tabIndex={0}
-                      aria-selected={item.id === selected?.id}
-                      onClick={() => setSelectedId(item.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          setSelectedId(item.id);
-                        }
-                      }}
-                    >
-                      <td>
-                        <span className="table-case">
-                          <img
-                            src={item.assets.original}
-                            alt=""
-                            loading="lazy"
-                          />
-                          <strong>{item.id}</strong>
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className={`table-pill ${hasRisk(item) ? "risk" : ""}`}
-                        >
-                          {hasRisk(item) ? "需关注" : "常规"}
-                        </span>
-                      </td>
-                      <td>
-                        {item.latestReview
-                          ? decisionLabels[item.latestReview.decision]
-                          : "待人工判断"}
-                      </td>
-                      <td>{item.latestReview?.reviewer || "—"}</td>
-                      <td>
-                        {item.latestReview
-                          ? humanTime(item.latestReview.created_at)
-                          : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {!visible.length && (
-              <p className="quiet-empty">当前筛选下没有案例。</p>
-            )}
-          </section>
-          <aside className="content-card review-detail">
-            {selected ? (
-              <>
-                <div className="content-head">
-                  <div>
-                    <span className="eyebrow">EVIDENCE / 案例摘要</span>
-                    <h2>{selected.id}</h2>
-                  </div>
-                  <CaseAnchor id={selected.id} className="icon-case-link">
-                    查看图像
-                  </CaseAnchor>
-                </div>
-                <div className="review-images">
-                  <img
-                    src={selected.assets.original}
-                    alt={`${selected.id} 原图`}
-                  />
-                  {resultImage ? (
-                    <img
-                      src={resultImage}
-                      alt={`${selected.id} ${previewCandidate} 候选`}
-                    />
-                  ) : (
-                    <div className="review-image-empty">候选图像</div>
-                  )}
-                </div>
-                <div className="review-image-labels">
-                  <span>原图</span>
-                  <span>
-                    {resultImage ? `${previewCandidate} 候选` : "暂无候选"}
-                  </span>
-                </div>
-                {hasRisk(selected) && (
-                  <div className="review-risk">
-                    <strong>风险提示</strong>
-                    {selected.riskReasons.length ? (
-                      selected.riskReasons.map((reason) => (
-                        <span key={reason}>{riskLabels[reason] || reason}</span>
-                      ))
-                    ) : (
-                      <span>请核对图像结构与执行范围</span>
-                    )}
-                  </div>
-                )}
-                {detailError && <p className="detail-error">{detailError}</p>}
-                {detail ? (
-                  <>
-                    <div className="review-detail-block">
-                      <span className="eyebrow">LATEST / 最近判断</span>
-                      {latest ? (
-                        <>
-                          <strong>
-                            {decisionLabels[latest.decision]} ·{" "}
-                            {latest.candidate || "整组候选"}
-                          </strong>
-                          <p>{latest.notes}</p>
-                          <small>
-                            {latest.reviewer} · {humanTime(latest.created_at)}
-                          </small>
-                        </>
-                      ) : (
-                        <p>尚无人工判断。进入工作台比较候选并记录依据。</p>
-                      )}
-                    </div>
-                    <div className="review-detail-block">
-                      <span className="eyebrow">HISTORY / 历史记录</span>
-                      {detail.reviews.length ? (
-                        <ol className="review-history">
-                          {detail.reviews
-                            .slice()
-                            .reverse()
-                            .map((event) => (
-                              <li key={event.id}>
-                                <strong>
-                                  {decisionLabels[event.decision]}
-                                </strong>
-                                <span>
-                                  {event.candidate || "整组候选"} ·{" "}
-                                  {event.reviewer} ·{" "}
-                                  {humanTime(event.created_at)}
-                                </span>
-                              </li>
-                            ))}
-                        </ol>
-                      ) : (
-                        <p>暂无记录</p>
-                      )}
-                    </div>
-                    <div className="review-detail-foot">
-                      <span>{detail.annotations.length} 条定位批注</span>
-                      <CaseAnchor id={selected.id} className="text-link">
-                        在工作台查看
-                      </CaseAnchor>
-                    </div>
-                  </>
-                ) : (
-                  !detailError && (
-                    <p className="quiet-empty">正在读取案例记录…</p>
-                  )
-                )}
-              </>
-            ) : (
-              <p className="quiet-empty">请选择案例查看摘要。</p>
-            )}
+        <div className="review-filter-row review-filter-redesign">
+          <div className="pill-tabs">{FILTERS.map(([key, label]) => <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{label}<span>{counts[key]}</span></button>)}</div>
+          <label className="inline-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索案例、文件或复核人" aria-label="搜索复核记录" /></label>
+        </div>
+        <div className="review-workspace">
+          <aside className="review-case-rail">
+            <div className="review-rail-head"><span>CASE QUEUE / 案例</span><strong>{visible.length}</strong></div>
+            <div className="review-case-scroll">{visible.map((item) => <button key={item.id} className={selected?.id === item.id ? "active" : ""} onClick={() => setSelectedId(item.id)}>
+              <img src={item.assets.original} alt="" loading="lazy" /><span><strong>{item.id}</strong><small>{item.latestReview ? decisionLabels[item.latestReview.decision] : "待人工判断"}{hasRisk(item) ? " · 风险" : ""}</small></span><ArrowRight size={14} />
+            </button>)}</div>
           </aside>
+          {selected ? <>
+            <section className="review-visual-stage">
+              <div className="review-stage-head"><div><span>CASE / {selected.id}</span><h2>{selected.imageName}</h2></div><CaseAnchor id={selected.id} className="review-workbench-link">在工作台检查</CaseAnchor></div>
+              {detailError && <p className="detail-error">{detailError}</p>}
+              <div className="review-main-visual">
+                {selectedCandidate?.image ? <img src={selectedCandidate.image} alt={`${selected.id} ${candidate} 候选`} /> : <div className="review-image-empty">暂无候选图像</div>}
+                <span className="review-image-corner">{candidate} / 数字修复候选</span>
+              </div>
+              <div className="review-evidence-strip">
+                <div><img src={selected.assets.original} alt={`${selected.id} 原图`} /><span>原图</span></div>
+                <div><img src={selected.assets.maskOverlay} alt={`${selected.id} 融合掩码`} /><span>执行掩码</span></div>
+                {["R3", "R7", "R12"].map((key) => <button key={key} disabled={!selected.variants[key]?.image} className={candidate === key ? "active" : ""} onClick={() => setCandidate(key)}>
+                  {selected.variants[key]?.image ? <img src={selected.variants[key].image} alt="" /> : <span className="review-thumb-empty">—</span>}<span>{key}{!selected.variants[key]?.image && " 未生成"}</span>
+                </button>)}
+              </div>
+              <div className="review-stage-foot"><span>{detail?.annotations.length || 0} 条定位批注</span><span>掩码外改动：{selectedCandidate?.outsideMaskChangedPixels ?? "—"} 像素</span></div>
+            </section>
+            <aside className="review-inspector">
+              <div className="review-inspector-title"><span>HUMAN REVIEW / 判断</span><h2>复核依据</h2></div>
+              <div className="review-inspector-summary"><span>最近判断</span><strong>{latest ? decisionLabels[latest.decision] : "待人工判断"}</strong>{latest && <p>{latest.reviewer} · {humanTime(latest.created_at)}</p>}</div>
+              {hasRisk(selected) && <div className="review-inspector-risk"><strong>风险提示</strong>{selected.riskReasons.length ? selected.riskReasons.map((reason) => <span key={reason}>{riskLabels[reason] || reason}</span>) : <span>请检查图像结构</span>}</div>}
+              <form onSubmit={submit} className="review-decision-form"><h3>记录当前判断</h3><label>当前候选<select value={candidate} onChange={(event) => setCandidate(event.target.value)}>{["R3", "R7", "R12"].map((key) => <option key={key} value={key} disabled={!selected.variants[key]?.image}>{key}</option>)}</select></label><label>复核结论<select value={decision} onChange={(event) => setDecision(event.target.value)} required><option value="">请选择</option>{Object.entries(decisionLabels).map(([key, label]) => <option key={key} value={key} disabled={key === "approve" && hasRisk(selected)}>{label}</option>)}</select></label><label>判断理由<textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="说明纹样、边缘或掩码范围的判断依据" rows={4} required /></label><button type="submit" disabled={busy || !detail}>{busy ? "正在保存…" : "保存判断"}</button>{message && <p role="status">{message}</p>}</form>
+              <div className="review-inspector-history"><h3>判断历史</h3>{detail?.reviews.length ? <ol>{detail.reviews.slice().reverse().map((entry) => <li key={entry.id}><strong>{decisionLabels[entry.decision]} · {entry.candidate || "整组候选"}</strong><small>{entry.reviewer} · {humanTime(entry.created_at)}</small><p>{entry.notes}</p></li>)}</ol> : <p>尚无判断记录</p>}</div>
+            </aside>
+          </> : <div className="review-no-case">当前筛选下没有案例。</div>}
         </div>
       </DataState>
     </PageFrame>
