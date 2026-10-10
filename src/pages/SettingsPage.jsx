@@ -94,7 +94,7 @@ export default function SettingsPage({ user, onUserChanged }) {
             {section === "models" && (
               <div className="settings-section">
                 <div className="settings-section-title"><h3>处理资料</h3><p>查看当前案例所关联的图像与候选来源</p></div>
-                <div className="settings-model-cards"><div><span>案例资料</span><strong>Golden20</strong><small>{cases.length} 个案例 · 640 × 640 px</small></div><div><span>候选来源</span><strong>Big-LaMa</strong><small>{candidateCount} 张参考候选</small></div></div>
+                <div className="settings-model-cards"><div><span>案例资料</span><strong>修复参考案例</strong><small>{cases.length} 个案例 · 640 × 640 px</small></div><div><span>候选来源</span><strong>Big-LaMa</strong><small>{candidateCount} 张参考候选</small></div></div>
                 <div className="settings-field"><span>候选尺度</span><strong>R3 / R7 / R12</strong></div>
                 <div className="settings-field"><span>融合执行掩码</span><strong>按案例关联</strong></div>
                 <div className="settings-field"><span>资料服务</span><strong className="settings-service"><i />{health?.ok ? "运行正常" : "正在检查"}</strong></div>

@@ -15,9 +15,7 @@ export function PageFrame({
     <main className={`inner-page ${className}`}>
       <div className="inner-heading">
         <div>
-          <div className="inner-breadcrumb">
-            GLADS Restore / Golden20 / {eyebrow}
-          </div>
+          <div className="inner-breadcrumb">GLADS Restore / {eyebrow}</div>
           <h1>{title}</h1>
           <p>{subtitle}</p>
         </div>

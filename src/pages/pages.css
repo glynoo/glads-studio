@@ -584,6 +584,62 @@
   gap: 16px;
   align-items: start;
 }
+.asset-path { display:flex; align-items:center; gap:9px; margin:0 0 18px; color:#d6c1aa; font-size:11px; }
+.asset-path button { padding:0; border:0; color:#ead2b5; font-size:11px; font-weight:700; }
+.asset-path button:hover { text-decoration:underline; }
+.asset-path > span:last-child { color:#f2e8dc; }
+.asset-overview-layout { display:grid; grid-template-columns:230px minmax(0,1fr); gap:16px; align-items:start; }
+.asset-overview-rail { position:sticky; top:16px; min-height:360px; padding:25px 21px; background:#e9ddcc; border-color:#d7c4af; }
+.asset-overview-rail .eyebrow,.asset-overview-heading .eyebrow,.asset-source-heading .eyebrow { color:#987254; font-size:9px; font-weight:700; letter-spacing:.12em; }
+.asset-overview-rail h2 { margin:7px 0 10px; color:#4b382b; font:23px Georgia,"Songti SC",serif; }
+.asset-overview-rail > p { margin:0; color:#796655; font-size:11px; line-height:1.7; }
+.asset-overview-counts { display:grid; gap:1px; margin:22px 0; border-top:1px solid #cdbba7; }
+.asset-overview-counts > div { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #cdbba7; }
+.asset-overview-counts strong { color:#5b3e2c; font:22px Georgia,serif; }
+.asset-overview-counts span { color:#7f6b58; font-size:11px; }
+.asset-overview-rail > button { display:inline-flex; align-items:center; gap:7px; border:0; border-radius:7px; padding:10px 13px; background:#63432e; color:#f7eadc; font-size:11px; font-weight:700; }
+.asset-overview-content { min-width:0; }
+.asset-overview-heading { display:flex; align-items:end; justify-content:space-between; gap:12px; padding:4px 2px 14px; }
+.asset-overview-heading h2 { margin:6px 0 0; color:#f1e7d8; font:22px Georgia,"Songti SC",serif; }
+.asset-overview-heading p { margin:7px 0 0; color:#c6b3a0; font-size:11px; }
+.asset-overview-heading > span { color:#cbb49e; font-size:11px; white-space:nowrap; }
+.asset-cave-list { display:grid; gap:12px; }
+.asset-cave-folder { display:flex; align-items:center; gap:16px; width:100%; min-width:0; min-height:132px; padding:18px 20px; text-align:left; font:inherit; background:#f7f4ec; transition:transform .18s,background .18s,border-color .18s; }
+.asset-cave-folder:hover { transform:translateY(-2px); background:#fffaf2; border-color:#c9aa8a; }
+.asset-cave-identity { display:flex; align-items:center; gap:14px; min-width:0; flex:1; }
+.asset-folder-icon { display:grid; place-items:center; width:45px; height:45px; flex:none; border-radius:9px; background:#e9d8c1; color:#81583f; }
+.asset-cave-identity > div { min-width:0; }
+.asset-cave-identity small { display:block; color:#a08064; font-size:10px; }
+.asset-cave-identity h3 { margin:4px 0 7px; color:#4f3d30; font:20px Georgia,"Songti SC",serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.asset-cave-identity p { margin:0; color:#8a796a; font-size:11px; }
+.asset-cave-preview { display:flex; gap:5px; flex:none; }
+.asset-cave-preview img { width:58px; height:65px; object-fit:cover; border-radius:4px; background:#ddd0be; }
+.asset-folder-arrow { flex:none; color:#98775d; }
+.asset-overview-empty { display:flex; align-items:center; justify-content:center; flex-direction:column; gap:11px; min-height:230px; padding:25px; text-align:center; background:#f0e9de; color:#4f3d30; }
+.asset-overview-empty > svg { color:#a47f61; }
+.asset-overview-empty strong { font-size:16px; }
+.asset-overview-empty span { color:#8a796a; font-size:11px; }
+.asset-overview-empty button { display:inline-flex; align-items:center; gap:5px; margin-top:4px; padding:9px 12px; border:0; border-radius:7px; background:#67442f; color:#f7eadc; font-size:11px; }
+.asset-source-overview,.asset-region-overview { min-width:0; }
+.asset-source-heading { padding:5px 2px 20px; color:#f2e8dc; }
+.asset-source-heading h2 { margin:7px 0; font:23px Georgia,"Songti SC",serif; }
+.asset-source-heading p { color:#c3b09f; font-size:11px; }
+.asset-source-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.asset-source-folder { display:flex; align-items:center; gap:12px; min-width:0; padding:13px; text-align:left; }
+.asset-source-folder:hover { background:#eee7dc; }
+.asset-source-folder img { width:58px; height:58px; object-fit:cover; flex:none; border-radius:5px; }
+.asset-source-folder span { min-width:0; }
+.asset-source-folder strong,.asset-source-folder small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.asset-source-folder strong { color:#4f3d30; font-size:11px; }
+.asset-source-folder small { margin-top:6px; color:#8a796a; font-size:10px; }
+.asset-region-folder { padding:19px 21px; margin-bottom:13px; }
+.asset-region-folder .content-head h3 { margin-top:5px; color:#4f3d30; font-size:17px; }
+.asset-region-images { display:flex; gap:11px; overflow:auto; padding:2px 0 5px; }
+.asset-region-images button { width:124px; flex:none; padding:0 0 9px; overflow:hidden; border:1px solid #e2d6c7; border-radius:8px; background:#fffaf2; text-align:left; }
+.asset-region-images img { display:block; width:100%; height:89px; object-fit:cover; }
+.asset-region-images span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:8px 8px 0; color:#4f4034; font-size:10px; }
+.uploaded-related-results { padding:20px; margin-bottom:14px; background:#e7e9df; border-color:#d6dccf; }
+.uploaded-related-results .asset-image { height:170px; }
 .asset-browser {
   padding: 21px 17px;
   position: sticky;
@@ -1190,6 +1246,12 @@
 }
 @media (max-width: 760px) {
   .home-dashboard-grid { grid-template-columns:1fr; }
+  .asset-overview-layout { grid-template-columns:1fr; }
+  .asset-overview-rail { position:static; min-height:auto; }
+  .asset-overview-counts { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+  .asset-overview-counts > div { display:block; }
+  .asset-cave-preview img:nth-child(n+3) { display:none; }
+  .asset-source-grid { grid-template-columns:1fr; }
   .inner-page {
     padding: 20px 14px 50px;
   }
@@ -1239,6 +1301,8 @@
   }
 }
 @media (max-width: 500px) {
+  .asset-cave-folder { min-height:116px; padding:14px; }
+  .asset-cave-preview { display:none; }
   .summary-grid-page {
     gap: 8px;
   }
