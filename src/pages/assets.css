@@ -2,6 +2,209 @@
   flex-wrap: wrap;
   overflow-wrap: anywhere;
 }
+.page-assets .pool-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin: 0 0 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #d7c4af;
+}
+.page-assets .pool-navigation > button {
+  background: transparent;
+  border: 0;
+  padding: 7px 0;
+  color: #705d4c;
+  font-size: 13px;
+}
+.page-assets .pool-navigation > button[aria-current="page"] {
+  color: #63432e;
+  box-shadow: inset 0 -2px #987254;
+  font-weight: 700;
+}
+.page-assets .pool-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.page-assets .pool-filters label,
+.page-assets .pool-new-cave label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  color: #705d4c;
+  font-size: 12px;
+}
+.page-assets .pool-filters select,
+.page-assets .pool-filters input,
+.page-assets .pool-navigation select,
+.page-assets .pool-project-picker,
+.page-assets .upload-form select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d7c4af;
+  border-radius: 6px;
+  background: #f8f1e7;
+  color: #4b382b;
+  padding: 9px;
+  font: inherit;
+}
+.page-assets .pool-navigation select,
+.page-assets .pool-project-picker {
+  width: auto;
+  max-width: 100%;
+  font-size: 13px;
+}
+.page-assets .pool-filter-tag-create,
+.page-assets .pool-filters > .upload-error {
+  grid-column: 1 / -1;
+}
+.page-assets .pool-overview-search {
+  margin-top: 16px;
+}
+.page-assets .pool-cave-row {
+  min-width: 0;
+}
+.page-assets .pool-cave-row .asset-cave-folder {
+  width: 100%;
+}
+.page-assets .pool-cave-edit {
+  display: block;
+  margin: 6px 0 0 auto;
+  font-size: 12px;
+}
+.page-assets .pool-tags {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.page-assets .pool-tags legend {
+  padding: 0;
+  margin-bottom: 8px;
+  color: #705d4c;
+  font-size: 12px;
+  font-weight: 700;
+}
+.page-assets .pool-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.page-assets .pool-tag-list button,
+.page-assets .pool-tag-list > span {
+  padding: 5px 8px;
+  border: 1px solid #d7c4af;
+  border-radius: 5px;
+  color: #705d4c;
+  background: #f8f1e7;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.page-assets .pool-tag-list button[aria-pressed="true"] {
+  background: #63432e;
+  color: #f8f1e7;
+}
+.page-assets .pool-tag-input {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.page-assets .pool-tag-input input {
+  flex: 1;
+  min-width: 0;
+}
+.page-assets .pool-tag-input button {
+  flex-shrink: 0;
+  color: #63432e;
+  font-size: 12px;
+}
+.page-assets .pool-upload-queue {
+  max-height: 240px;
+  overflow: auto;
+}
+.page-assets .pool-upload-queue > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #d7c4af;
+}
+.page-assets .pool-upload-queue img {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 5px;
+}
+.page-assets .pool-upload-queue span {
+  flex: 1;
+  min-width: 0;
+}
+.page-assets .pool-upload-queue strong,
+.page-assets .pool-upload-queue small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.page-assets .pool-upload-queue strong {
+  font-size: 13px;
+}
+.page-assets .pool-upload-queue small,
+.page-assets .pool-upload-queue p {
+  color: #705d4c;
+  font-size: 12px;
+}
+.page-assets .pool-new-cave {
+  display: grid;
+  gap: 10px;
+}
+.page-assets .pool-library-item {
+  text-align: left;
+  cursor: pointer;
+}
+.page-assets .pool-preview-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.page-assets .pool-library-item h3,
+.page-assets .pool-library-item p {
+  overflow-wrap: anywhere;
+}
+.page-assets .pool-library-item .asset-image {
+  display: grid;
+  place-items: center;
+}
+.page-assets .pool-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin: 20px 0;
+  color: #705d4c;
+  font-size: 13px;
+}
+.page-assets button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+@media (max-width: 760px) {
+  .page-assets .pool-filters select,
+  .page-assets .pool-filters input,
+  .page-assets .pool-project-picker,
+  .page-assets .pool-navigation select,
+  .page-assets .upload-form select {
+    font-size: 16px;
+  }
+  .page-assets .pool-project-picker {
+    width: 100%;
+  }
+}
 .page-assets .asset-detail-head > div:first-child {
   min-width: 0;
   flex: 1 1 220px;

@@ -7,10 +7,11 @@
     "dev": "node scripts/dev.mjs",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "npm run test:api",
+    "test": "npm run test:api && npm run test:pool",
     "dev:web": "vite --host 127.0.0.1",
     "dev:api": "python3 server/app.py",
-    "test:api": "node scripts/test-api.mjs"
+    "test:api": "node scripts/test-api.mjs",
+    "test:pool": "node --test scripts/test-pool-filters.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

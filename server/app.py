@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import io
 import json
+import mimetypes
 import os
 import re
 import secrets
@@ -22,7 +23,8 @@ from email.parser import BytesParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.cookies import SimpleCookie
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs, quote
+from material_pool import PoolStore, tags as validate_tags, catalog_page, catalog_file
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = Path(__file__).resolve().parents[1]
@@ -138,6 +140,9 @@ def connection():
         con.close()
 
 
+POOL = PoolStore(connection, DB_LOCK)
+
+
 def init_db():
     with connection() as con:
         con.executescript("""
@@ -180,10 +185,13 @@ def init_db():
             ("review_events", "reviewer_user_id", "INTEGER"),
             ("uploads", "parent_id", "TEXT"),
             ("uploads", "confirmed_at", "TEXT"),
+            ("uploads", "tags", "TEXT NOT NULL DEFAULT '[]'"),
+            ("uploads", "category", "TEXT NOT NULL DEFAULT 'original'"),
         ):
             existing = {row["name"] for row in con.execute(f"PRAGMA table_info({table})")}
             if column not in existing:
                 con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+    POOL.init()
 
 
 def public_user(row):
@@ -310,6 +318,10 @@ def save_upload(user, fields, filename, blob):
     if not blob or len(blob) > MAX_UPLOAD_BYTES:
         raise ValueError("图片大小须在 20 MB 以内")
     mime, suffix = image_type(blob)
+    asset_tags = validate_tags(json.loads(fields.get("tags", "[]")))
+    category = fields.get("category", "original")
+    if not isinstance(category, str) or category not in {"original", "clean", "validation"}:
+        raise ValueError("未知图片分类")
     filename = Path(str(filename or "image").replace("\\", "/")).name[:180]
     values = {key: str(fields.get(key, "")).strip() for key in ("cave", "mural", "source", "note", "parentId")}
     parent_id = values["parentId"] or None
@@ -342,6 +354,7 @@ def save_upload(user, fields, filename, blob):
                            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                         (asset_id, filename, mime, len(blob), digest, values["cave"], values["mural"],
                          values["source"], values["note"], user["id"], now, storage_name, parent_id))
+            con.execute("UPDATE uploads SET tags=?,category=? WHERE id=?", (json.dumps(asset_tags, ensure_ascii=False), category, asset_id))
     except Exception:
         path.unlink(missing_ok=True)
         raise
@@ -355,6 +368,7 @@ def upload_dict(row):
         "note": row["note"], "uploadedAt": row["created_at"], "uploadedBy": row["display_name"],
         "parentId": row["parent_id"], "confirmedAt": row["confirmed_at"],
         "uploadedById": row["uploaded_by"],
+        "tags": json.loads(row["tags"]), "category": row["category"],
         "imageUrl": f"/api/uploads/{row['id']}/image",
     }
 
@@ -380,6 +394,10 @@ def update_upload_metadata(user, asset_id, payload):
     source, note = payload["source"].strip(), payload["note"].strip()
     if not source or len(source) > 300 or len(note) > 1000:
         raise ValueError("来源须为 1 至 300 字，备注不超过 1000 字")
+    asset_tags = validate_tags(payload["tags"]) if "tags" in payload else None
+    category = payload.get("category")
+    if category is not None and (not isinstance(category, str) or category not in {"original", "clean", "validation"}):
+        raise ValueError("未知图片分类")
     with DB_LOCK, connection() as con:
         row = con.execute("SELECT uploaded_by FROM uploads WHERE id=?", (asset_id,)).fetchone()
         if not row:
@@ -387,6 +405,10 @@ def update_upload_metadata(user, asset_id, payload):
         if row["uploaded_by"] != user["id"]:
             raise PermissionError("仅上传人可以修改素材信息")
         con.execute("UPDATE uploads SET source=?, note=? WHERE id=?", (source, note, asset_id))
+        if asset_tags is not None:
+            con.execute("UPDATE uploads SET tags=? WHERE id=?", (json.dumps(asset_tags, ensure_ascii=False), asset_id))
+        if category is not None:
+            con.execute("UPDATE uploads SET category=? WHERE id=?", (category, asset_id))
     return get_upload(asset_id)
 
 
@@ -513,7 +535,7 @@ class Handler(BaseHTTPRequestHandler):
             if name == "file":
                 filename = part.get_filename()
                 blob = data
-            elif name in {"cave", "mural", "source", "note", "parentId"} and data is not None:
+            elif name in {"cave", "mural", "source", "note", "parentId", "tags", "category"} and data is not None:
                 fields[name] = data.decode("utf-8", errors="replace")
         if blob is None:
             raise ValueError("请选择要上传的图片")
@@ -528,6 +550,30 @@ class Handler(BaseHTTPRequestHandler):
         user = self.current_user()
         if not user:
             return self.json(401, {"error": "请先登录"})
+        if path.startswith("/api/material-pool"):
+            try:
+                if path == "/api/material-pool":
+                    return self.json(200, POOL.state(user))
+                params = parse_qs(urlparse(self.path).query)
+                if path == "/api/material-pool/catalog":
+                    return self.json(200, catalog_page(params))
+                if path == "/api/material-pool/file":
+                    file_path = catalog_file(params.get("id", [""])[0])
+                    with file_path.open("rb") as source:
+                        self.send_response(200)
+                        self.send_header("Content-Type", mimetypes.guess_type(file_path.name)[0] or "application/octet-stream")
+                        self.send_header("Content-Length", str(file_path.stat().st_size))
+                        self.send_header("Content-Disposition", f"inline; filename*=UTF-8''{quote(file_path.name)}")
+                        self.send_header("Cache-Control", "private, max-age=3600")
+                        self.end_headers()
+                        for chunk in iter(lambda: source.read(65536), b""):
+                            self.wfile.write(chunk)
+                    return
+            except (LookupError, FileNotFoundError) as error:
+                return self.json(404, {"error": str(error)})
+            except (ValueError, TypeError) as error:
+                return self.json(400, {"error": str(error)})
+            return self.json(404, {"error": "Not found"})
         if path == "/api/auth/activity":
             return self.json(200, {"items": account_activity(user)})
         if path == "/api/uploads":
@@ -644,7 +690,25 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 fields, filename, blob = self.multipart()
                 return self.json(201, save_upload(user, fields, filename, blob))
-            except ValueError as error:
+            except (ValueError, TypeError) as error:
+                return self.json(400, {"error": str(error)})
+        if path in {"/api/material-pool/caves", "/api/material-pool/preferences"} or re.fullmatch(r"/api/uploads/upload_[0-9a-f]{32}/delete", path):
+            try:
+                payload = self.body()
+                if path.endswith("/caves"):
+                    result = POOL.save_cave(user, payload)
+                elif path.endswith("/preferences"):
+                    result = POOL.change_preferences(user, payload)
+                else:
+                    if payload.get("confirmed") is not True:
+                        raise ValueError("请确认删除素材及其切片")
+                    result = POOL.delete_asset(user, path.split("/")[3], UPLOAD_DIR)
+                return self.json(200, result)
+            except PermissionError as error:
+                return self.json(403, {"error": str(error)})
+            except LookupError as error:
+                return self.json(404, {"error": str(error)})
+            except (ValueError, TypeError) as error:
                 return self.json(400, {"error": str(error)})
         metadata_match = re.fullmatch(r"/api/uploads/(upload_[0-9a-f]{32})/metadata", path)
         if metadata_match:

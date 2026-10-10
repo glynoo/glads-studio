@@ -1,10 +1,12 @@
 import http.cookiejar
 import json
+import os
 import tempfile
 import threading
 import unittest
 import urllib.error
 import urllib.request
+from unittest.mock import patch
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
@@ -59,6 +61,41 @@ class UploadHttpTest(unittest.TestCase):
                 request(other, "/api/auth/register", {"displayName": "其他人", "email": "other@example.com", "password": "material-pool-123"})
                 self.assertEqual(request(other, path, payload)[0], 403)
                 self.assertEqual(request(owner, "/api/uploads")[1]["items"][0]["note"], payload["note"])
+                status, state = request(owner, "/api/material-pool/caves", {"name": "第 285 窟", "period": "北魏", "note": "采集记录"})
+                self.assertEqual(status, 200)
+                self.assertTrue(any(c["name"] == "第 285 窟" for c in state["caves"]))
+                self.assertEqual(request(other, "/api/material-pool/caves", {"previous": "第 285 窟", "name": "第 286 窟", "period": "唐"})[0], 403)
+                preferences = "/api/material-pool/preferences"
+                self.assertEqual(request(owner, preferences, {"action": "favorite", "assetId": asset["id"], "enabled": True})[0], 200)
+                self.assertEqual(request(owner, "/api/material-pool")[1]["favorites"], [asset["id"]])
+                self.assertFalse(request(other, "/api/material-pool")[1]["favorites"])
+                status, state = request(owner, preferences, {"action": "project", "name": "飞天"})
+                self.assertEqual(status, 200)
+                project_id = state["projects"][0]["id"]
+                self.assertEqual(request(owner, preferences, {"action": "projectMember", "projectId": project_id, "assetId": asset["id"], "enabled": True})[0], 200)
+                self.assertEqual(request(owner, "/api/material-pool")[1]["projects"][0]["assetIds"], [asset["id"]])
+                self.assertEqual(request(owner, path, {**payload, "tags": ["飞天"], "category": "clean"})[0], 200)
+                self.assertEqual(request(owner, "/api/uploads")[1]["items"][0]["tags"], ["飞天"])
+                self.assertEqual(request(owner, path, {**payload, "category": {}})[0], 400)
+                deletion = f"/api/uploads/{asset['id']}/delete"
+                self.assertEqual(request(other, deletion, {"confirmed": True})[0], 403)
+                self.assertEqual(request(owner, deletion, {"confirmed": False})[0], 400)
+                self.assertEqual(request(owner, deletion, {"confirmed": True})[0], 200)
+                self.assertFalse(request(owner, "/api/uploads")[1]["items"])
+                self.assertFalse(request(owner, "/api/material-pool")[1]["favorites"])
+                catalog_dir = Path(folder) / "catalog"
+                catalog_dir.mkdir()
+                (catalog_dir / "test.png").write_bytes(image)
+                (catalog_dir / "catalog.json").write_text(json.dumps({"items": {"mask": [{"id": "test", "name": "test.png", "path": "test.png", "uri": "./assets/glads/test.png", "category": "测试掩码"}], "model": [], "evidence": []}}), encoding="utf-8")
+                with patch.dict(os.environ, {"GLADS_MATERIAL_POOL_DIR": str(catalog_dir)}):
+                    status, data = request(owner, "/api/material-pool/catalog?kind=mask")
+                    self.assertEqual(status, 200)
+                    self.assertEqual(data["total"], 1)
+                    with owner.open(base + data["items"][0]["fileUrl"], timeout=5) as response:
+                        self.assertEqual(response.read(), image)
+                    self.assertEqual(request(owner, "/api/material-pool/catalog?kind=unknown")[0], 400)
+                    self.assertEqual(request(owner, "/api/material-pool/file?id=missing")[0], 404)
+                    self.assertEqual(request(urllib.request.build_opener(), "/api/material-pool/catalog?kind=mask")[0], 401)
             finally:
                 server.shutdown()
                 server.server_close()

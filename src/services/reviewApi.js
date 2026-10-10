@@ -23,6 +23,24 @@ async function request(path, options = {}) {
   return body;
 }
 export const reviewApi = {
+  poolState: () => request("/api/material-pool"),
+  saveCave: (value) =>
+    request("/api/material-pool/caves", {
+      method: "POST",
+      body: JSON.stringify(value),
+    }),
+  changePool: (value) =>
+    request("/api/material-pool/preferences", {
+      method: "POST",
+      body: JSON.stringify(value),
+    }),
+  deleteUpload: (id) =>
+    request(`/api/uploads/${encodeURIComponent(id)}/delete`, {
+      method: "POST",
+      body: JSON.stringify({ confirmed: true }),
+    }),
+  catalog: (params) =>
+    request(`/api/material-pool/catalog?${new URLSearchParams(params)}`),
   health: () => request("/api/health"),
   listCases: () => request("/api/cases"),
   getCase: (id) => request(`/api/cases/${encodeURIComponent(id)}`),

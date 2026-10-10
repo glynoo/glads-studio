@@ -1,5 +1,6 @@
 import React from "react";
 import { ArrowRight, FolderOpen, Upload } from "lucide-react";
+import { PoolFilters } from "./PoolTools.jsx";
 
 export default function AssetOverview({
   caves,
@@ -8,6 +9,11 @@ export default function AssetOverview({
   onOpenCave,
   onUpload,
   onRetry,
+  filters,
+  onFilters,
+  items,
+  pool,
+  onEditCave,
 }) {
   const imageCount = caves.reduce((sum, cave) => sum + cave.images.length, 0);
   const sliceCount = caves.reduce((sum, cave) => sum + cave.sliceCount, 0);
@@ -32,6 +38,22 @@ export default function AssetOverview({
             <span>切片</span>
           </div>
         </div>
+        <label className="inline-search pool-overview-search">
+          <input
+            aria-label="搜索洞窟或壁画"
+            placeholder="搜索洞窟或壁画"
+            value={filters.query || ""}
+            onChange={(e) => onFilters({ ...filters, query: e.target.value })}
+          />
+        </label>
+        <PoolFilters
+          includeCave
+          items={items}
+          pool={pool}
+          filters={filters}
+          onChange={onFilters}
+          onReset={() => onFilters({ query: "", sort: "cave" })}
+        />
         <button onClick={onUpload}>
           <Upload size={15} /> 上传素材
         </button>
@@ -61,45 +83,87 @@ export default function AssetOverview({
         ) : error ? null : caves.length ? (
           <div className="asset-cave-list">
             {caves.map((cave) => (
-              <button
-                className="asset-cave-folder content-card"
-                key={cave.name}
-                onClick={() => onOpenCave(cave.name)}
-              >
-                <div className="asset-cave-identity">
-                  <span className="asset-folder-icon">
-                    <FolderOpen size={23} />
-                  </span>
-                  <div>
-                    <small>洞窟</small>
-                    <h3>{cave.name}</h3>
-                    <p>
-                      {cave.regions.size} 个区域 · {cave.images.length} 张图片 ·{" "}
-                      {cave.sliceCount} 张切片
-                    </p>
+              <div className="pool-cave-row" key={cave.name}>
+                <button
+                  className="asset-cave-folder content-card"
+                  key={cave.name}
+                  onClick={() => onOpenCave(cave.name)}
+                >
+                  <div className="asset-cave-identity">
+                    <span className="asset-folder-icon">
+                      <FolderOpen size={23} />
+                    </span>
+                    <div>
+                      <small>洞窟</small>
+                      <h3>{cave.name}</h3>
+                      {(cave.period || cave.note) && (
+                        <p>
+                          {cave.period} {cave.note}
+                        </p>
+                      )}
+                      <p>
+                        {cave.regions.size} 个区域 · {cave.images.length} 张图片
+                        · {cave.sliceCount} 张切片
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="asset-cave-preview">
-                  {cave.images.slice(0, 4).map((image) => (
-                    <img
-                      key={image.id}
-                      src={image.imageUrl}
-                      alt=""
-                      loading="lazy"
-                    />
-                  ))}
-                </div>
-                <ArrowRight className="asset-folder-arrow" size={18} />
-              </button>
+                  <div className="asset-cave-preview">
+                    {cave.images.slice(0, 4).map((image) => (
+                      <img
+                        key={image.id}
+                        src={image.imageUrl}
+                        alt=""
+                        loading="lazy"
+                      />
+                    ))}
+                  </div>
+                  <ArrowRight className="asset-folder-arrow" size={18} />
+                </button>
+                {cave.canEdit && (
+                  <button
+                    className="text-link pool-cave-edit"
+                    type="button"
+                    onClick={() => onEditCave(cave)}
+                    aria-label={`编辑 ${cave.name}`}
+                  >
+                    编辑洞窟
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         ) : (
           <div className="content-card asset-overview-empty">
             <FolderOpen size={31} />
-            <strong>还没有上传的洞窟素材</strong>
-            <span>上传图片时填写洞窟和区域，素材会按层级归入这里。</span>
-            <button onClick={onUpload}>
-              上传第一张图片 <ArrowRight size={14} />
+            <strong>
+              {filters.query ||
+              filters.cave ||
+              filters.mural ||
+              filters.category ||
+              filters.tag
+                ? "没有匹配的洞窟或素材"
+                : "还没有上传的洞窟素材"}
+            </strong>
+            <span>可调整筛选，或上传图片并填写洞窟和区域。</span>
+            <button
+              onClick={
+                filters.query ||
+                filters.cave ||
+                filters.mural ||
+                filters.category ||
+                filters.tag
+                  ? () => onFilters({ query: "", sort: "cave" })
+                  : onUpload
+              }
+            >
+              {filters.query ||
+              filters.cave ||
+              filters.mural ||
+              filters.category ||
+              filters.tag
+                ? "清除筛选"
+                : "上传第一张图片"}{" "}
+              <ArrowRight size={14} />
             </button>
           </div>
         )}

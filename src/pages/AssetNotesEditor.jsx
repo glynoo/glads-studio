@@ -1,10 +1,19 @@
 import React, { useRef, useState } from "react";
 import { Modal } from "../components/UI.jsx";
 import { reviewApi } from "../services/reviewApi.js";
+import PoolTagField from "./PoolTagField.jsx";
+import { categoryLabels } from "./poolFilters.js";
 
-export default function AssetNotesEditor({ asset, onClose, onSaved }) {
+export default function AssetNotesEditor({
+  asset,
+  onClose,
+  onSaved,
+  availableTags,
+}) {
   const [source, setSource] = useState(asset.source);
   const [note, setNote] = useState(asset.note);
+  const [tags, setTags] = useState(asset.tags || []);
+  const [category, setCategory] = useState(asset.category || "original");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const saving = useRef(false);
@@ -22,6 +31,8 @@ export default function AssetNotesEditor({ asset, onClose, onSaved }) {
       const updated = await reviewApi.updateUploadMetadata(asset.id, {
         source: source.trim(),
         note: note.trim(),
+        tags,
+        category,
       });
       onSaved(updated);
       onClose();
@@ -33,7 +44,7 @@ export default function AssetNotesEditor({ asset, onClose, onSaved }) {
     }
   }
   return (
-    <Modal title="编辑来源与备注" onClose={close}>
+    <Modal title="编辑素材信息与标签" onClose={close}>
       <form className="upload-form asset-note-form" onSubmit={submit}>
         <p className="modal-caption">{asset.filename}</p>
         <label>
@@ -62,6 +73,26 @@ export default function AssetNotesEditor({ asset, onClose, onSaved }) {
             {error}
           </p>
         )}
+        <label>
+          图片分类
+          <select
+            disabled={busy}
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            {Object.entries(categoryLabels).map(([key, value]) => (
+              <option key={key} value={key}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+        <PoolTagField
+          tags={tags}
+          available={availableTags}
+          onChange={setTags}
+          disabled={busy}
+        />
         <div className="modal-actions">
           <button type="button" onClick={close} disabled={busy}>
             取消
