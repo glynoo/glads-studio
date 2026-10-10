@@ -3,16 +3,23 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import hmac
 import io
 import json
 import os
 import re
+import secrets
 import sqlite3
 import sys
 import threading
+import time
+import uuid
 import zipfile
 from datetime import datetime, timezone
+from email import policy
+from email.parser import BytesParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.cookies import SimpleCookie
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -20,13 +27,17 @@ ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE = Path(os.environ.get("GLADS_GOLDEN20_ZIP", ROOT / "GLADS_v1.0交付包" / "GLADS-03-Golden20-Reference-v1.0_20260810.zip"))
 DATABASE = Path(os.environ.get("GLADS_REVIEW_DB", APP_ROOT / "data" / "reviews.sqlite3"))
+UPLOAD_DIR = Path(os.environ.get("GLADS_UPLOAD_DIR", APP_ROOT / "data" / "uploads"))
 ZIP_PREFIX = "GLADS-Student-Release/"
 MANIFEST = ZIP_PREFIX + "reference_baseline/golden20/lama_rescue_manifest.jsonl"
 ARCHIVE_SHA256 = "d12309225db879b3147d4e51186eedd4379ef3357a8d9605fde36fe9d3467890"
 DECISIONS = {"approve", "reject", "secondary_repair_required", "defer_expert"}
 CANDIDATES = {"R3": 3, "R7": 7, "R12": 12}
 CASE_ID = re.compile(r"^case_(\d{4})$")
+UPLOAD_ID = re.compile(r"^upload_[0-9a-f]{32}$")
 DB_LOCK = threading.Lock()
+SESSION_SECONDS = 7 * 24 * 60 * 60
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 
 def verify_archive(path=ARCHIVE):
@@ -116,6 +127,22 @@ def connection():
 def init_db():
     with connection() as con:
         con.executescript("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, display_name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE, password_salt BLOB NOT NULL,
+            password_hash BLOB NOT NULL, created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS sessions (
+            token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS uploads (
+            id TEXT PRIMARY KEY, filename TEXT NOT NULL, mime TEXT NOT NULL,
+            size INTEGER NOT NULL, sha256 TEXT NOT NULL, cave TEXT NOT NULL,
+            mural TEXT NOT NULL, source TEXT NOT NULL, note TEXT NOT NULL,
+            uploaded_by INTEGER NOT NULL, created_at TEXT NOT NULL,
+            storage_name TEXT NOT NULL, FOREIGN KEY(uploaded_by) REFERENCES users(id)
+        );
         CREATE TABLE IF NOT EXISTS annotations (
             id INTEGER PRIMARY KEY AUTOINCREMENT, case_id TEXT NOT NULL, candidate TEXT NOT NULL,
             x REAL NOT NULL, y REAL NOT NULL, category TEXT NOT NULL, text TEXT NOT NULL,
@@ -128,7 +155,159 @@ def init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_annotations_case ON annotations(case_id);
         CREATE INDEX IF NOT EXISTS idx_review_events_case ON review_events(case_id);
+        CREATE INDEX IF NOT EXISTS idx_uploads_created ON uploads(created_at);
         """)
+        for table, column, definition in (
+            ("annotations", "candidate_sha256", "TEXT"),
+            ("annotations", "reviewer_user_id", "INTEGER"),
+            ("review_events", "candidate_sha256", "TEXT"),
+            ("review_events", "reviewer_user_id", "INTEGER"),
+        ):
+            existing = {row["name"] for row in con.execute(f"PRAGMA table_info({table})")}
+            if column not in existing:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def public_user(row):
+    return {"id": row["id"], "displayName": row["display_name"], "email": row["email"]}
+
+
+def register_user(payload):
+    name = str(payload.get("displayName", "")).strip()
+    email = str(payload.get("email", "")).strip().lower()
+    password = payload.get("password")
+    if not 2 <= len(name) <= 80 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) or len(email) > 254:
+        raise ValueError("请填写姓名和有效邮箱")
+    if not isinstance(password, str) or not 8 <= len(password) <= 128:
+        raise ValueError("密码须为 8 至 128 个字符")
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 260000)
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        with DB_LOCK, connection() as con:
+            cursor = con.execute(
+                "INSERT INTO users(display_name,email,password_salt,password_hash,created_at) VALUES(?,?,?,?,?)",
+                (name, email, salt, digest, now),
+            )
+            row = con.execute("SELECT * FROM users WHERE id=?", (cursor.lastrowid,)).fetchone()
+    except sqlite3.IntegrityError:
+        raise ValueError("该邮箱已注册") from None
+    return public_user(row)
+
+
+def login_user(payload):
+    email = str(payload.get("email", "")).strip().lower()
+    password = payload.get("password")
+    with connection() as con:
+        row = con.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+    if not row or not isinstance(password, str):
+        raise ValueError("邮箱或密码不正确")
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), row["password_salt"], 260000)
+    if not hmac.compare_digest(digest, row["password_hash"]):
+        raise ValueError("邮箱或密码不正确")
+    return public_user(row)
+
+
+def new_session(user_id):
+    token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode("ascii")).hexdigest()
+    with DB_LOCK, connection() as con:
+        con.execute("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)",
+                    (token_hash, user_id, int(time.time()) + SESSION_SECONDS))
+    return token
+
+
+def session_token(cookie_header):
+    try:
+        cookies = SimpleCookie()
+        cookies.load(cookie_header or "")
+        return cookies["glads_session"].value if "glads_session" in cookies else None
+    except Exception:
+        return None
+
+
+def user_from_cookie(cookie_header):
+    token = session_token(cookie_header)
+    if not token:
+        return None
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    with connection() as con:
+        row = con.execute("""SELECT users.* FROM sessions JOIN users ON users.id=sessions.user_id
+                             WHERE sessions.token_hash=? AND sessions.expires_at>?""",
+                          (token_hash, int(time.time()))).fetchone()
+    return public_user(row) if row else None
+
+
+def clear_session(cookie_header):
+    token = session_token(cookie_header)
+    if token:
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        with DB_LOCK, connection() as con:
+            con.execute("DELETE FROM sessions WHERE token_hash=?", (token_hash,))
+
+
+def image_type(blob):
+    if blob.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png", ".png"
+    if blob.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg", ".jpg"
+    if len(blob) >= 12 and blob[:4] == b"RIFF" and blob[8:12] == b"WEBP":
+        return "image/webp", ".webp"
+    raise ValueError("请上传 JPG、PNG 或 WebP 图片")
+
+
+def save_upload(user, fields, filename, blob):
+    if not blob or len(blob) > MAX_UPLOAD_BYTES:
+        raise ValueError("图片大小须在 20 MB 以内")
+    mime, suffix = image_type(blob)
+    filename = Path(str(filename or "image").replace("\\", "/")).name[:180]
+    values = {key: str(fields.get(key, "")).strip() for key in ("cave", "mural", "source", "note")}
+    if not values["cave"] or not values["mural"] or not values["source"]:
+        raise ValueError("请填写洞窟、壁画位置和图像来源")
+    if any(len(value) > limit for value, limit in zip(values.values(), (100, 100, 300, 1000))):
+        raise ValueError("素材信息过长")
+    asset_id = "upload_" + uuid.uuid4().hex
+    storage_name = asset_id + suffix
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    path = UPLOAD_DIR / storage_name
+    temporary = UPLOAD_DIR / (storage_name + ".tmp")
+    temporary.write_bytes(blob)
+    temporary.replace(path)
+    now = datetime.now(timezone.utc).isoformat()
+    digest = hashlib.sha256(blob).hexdigest()
+    try:
+        with DB_LOCK, connection() as con:
+            con.execute("""INSERT INTO uploads(id,filename,mime,size,sha256,cave,mural,source,note,uploaded_by,created_at,storage_name)
+                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (asset_id, filename, mime, len(blob), digest, values["cave"], values["mural"],
+                         values["source"], values["note"], user["id"], now, storage_name))
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+    return get_upload(asset_id)
+
+
+def upload_dict(row):
+    return {
+        "id": row["id"], "filename": row["filename"], "mime": row["mime"], "size": row["size"],
+        "sha256": row["sha256"], "cave": row["cave"], "mural": row["mural"], "source": row["source"],
+        "note": row["note"], "uploadedAt": row["created_at"], "uploadedBy": row["display_name"],
+        "imageUrl": f"/api/uploads/{row['id']}/image",
+    }
+
+
+def get_upload(asset_id):
+    with connection() as con:
+        row = con.execute("""SELECT uploads.*, users.display_name FROM uploads JOIN users ON users.id=uploads.uploaded_by
+                             WHERE uploads.id=?""", (asset_id,)).fetchone()
+    return upload_dict(row) if row else None
+
+
+def list_uploads():
+    with connection() as con:
+        rows = con.execute("""SELECT uploads.*, users.display_name FROM uploads JOIN users ON users.id=uploads.uploaded_by
+                              ORDER BY uploads.created_at DESC""").fetchall()
+    return [upload_dict(row) for row in rows]
 
 
 def records(case_id):
@@ -153,8 +332,10 @@ def add_annotation(case_id, payload):
         raise ValueError("Category, note and reviewer are required")
     now = datetime.now(timezone.utc).isoformat()
     with DB_LOCK, connection() as con:
-        cursor = con.execute("INSERT INTO annotations(case_id,candidate,x,y,category,text,reviewer,created_at) VALUES(?,?,?,?,?,?,?,?)",
-                             (case_id, candidate, payload["x"], payload["y"], category, text, reviewer, now))
+        cursor = con.execute("""INSERT INTO annotations(case_id,candidate,x,y,category,text,reviewer,created_at,candidate_sha256,reviewer_user_id)
+                                VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                             (case_id, candidate, payload["x"], payload["y"], category, text, reviewer, now,
+                              payload.get("_candidate_sha256"), payload.get("_reviewer_user_id")))
         row = con.execute("SELECT * FROM annotations WHERE id=?", (cursor.lastrowid,)).fetchone()
     return dict(row)
 
@@ -174,9 +355,12 @@ def add_review(case, payload):
         if case["semanticRisk"] or case["riskReasons"]:
             raise ValueError("Risk cases cannot be approved in this first-stage workflow; defer or reject them")
     now = datetime.now(timezone.utc).isoformat()
+    candidate_sha256 = case["variants"].get(candidate, {}).get("sha256") if candidate else None
     with DB_LOCK, connection() as con:
-        cursor = con.execute("INSERT INTO review_events(case_id,candidate,decision,reviewer,notes,created_at) VALUES(?,?,?,?,?,?)",
-                             (case["id"], candidate, decision, reviewer, notes, now))
+        cursor = con.execute("""INSERT INTO review_events(case_id,candidate,decision,reviewer,notes,created_at,candidate_sha256,reviewer_user_id)
+                                VALUES(?,?,?,?,?,?,?,?)""",
+                             (case["id"], candidate, decision, reviewer, notes, now,
+                              candidate_sha256, payload.get("_reviewer_user_id")))
         row = con.execute("SELECT * FROM review_events WHERE id=?", (cursor.lastrowid,)).fetchone()
     return dict(row)
 
@@ -184,14 +368,22 @@ def add_review(case, payload):
 class Handler(BaseHTTPRequestHandler):
     catalog: ArchiveCatalog
 
-    def json(self, status, data):
+    def json(self, status, data, cookie=None):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
         self.end_headers()
         self.wfile.write(body)
+
+    def current_user(self):
+        return user_from_cookie(self.headers.get("Cookie"))
+
+    def login_cookie(self, token):
+        return f"glads_session={token}; HttpOnly; SameSite=Lax; Path=/; Max-Age={SESSION_SECONDS}"
 
     def body(self):
         if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
@@ -204,10 +396,64 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Expected a JSON object")
         return payload
 
+    def multipart(self):
+        content_type = self.headers.get("Content-Type", "")
+        if not content_type.startswith("multipart/form-data;"):
+            raise ValueError("请选择要上传的图片")
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            raise ValueError("无效的上传大小") from None
+        if not 0 < length <= MAX_UPLOAD_BYTES + 1024 * 1024:
+            raise ValueError("图片大小须在 20 MB 以内")
+        raw = self.rfile.read(length)
+        message = BytesParser(policy=policy.default).parsebytes(
+            (f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n").encode("ascii") + raw
+        )
+        if not message.is_multipart():
+            raise ValueError("无法读取上传内容")
+        fields = {}
+        filename = None
+        blob = None
+        for part in message.iter_parts():
+            name = part.get_param("name", header="content-disposition")
+            data = part.get_payload(decode=True)
+            if name == "file":
+                filename = part.get_filename()
+                blob = data
+            elif name in {"cave", "mural", "source", "note"} and data is not None:
+                fields[name] = data.decode("utf-8", errors="replace")
+        if blob is None:
+            raise ValueError("请选择要上传的图片")
+        return fields, filename, blob
+
     def do_GET(self):
         path = urlparse(self.path).path
         if path == "/api/health":
             return self.json(200, {"ok": True, "source": "Golden20 Big-LaMa reference", "algorithmAvailable": False, "cases": len(self.catalog.cases)})
+        if path == "/api/auth/me":
+            return self.json(200, {"user": self.current_user()})
+        if not self.current_user():
+            return self.json(401, {"error": "请先登录"})
+        if path == "/api/uploads":
+            return self.json(200, {"items": list_uploads()})
+        upload_match = re.fullmatch(r"/api/uploads/(upload_[0-9a-f]{32})/image", path)
+        if upload_match:
+            asset_id = upload_match.group(1)
+            with connection() as con:
+                row = con.execute("SELECT mime,storage_name FROM uploads WHERE id=?", (asset_id,)).fetchone()
+            if not row:
+                return self.json(404, {"error": "素材不存在"})
+            image_path = UPLOAD_DIR / row["storage_name"]
+            if image_path.resolve().parent != UPLOAD_DIR.resolve() or not image_path.is_file():
+                return self.json(404, {"error": "图像文件不存在"})
+            image = image_path.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", row["mime"])
+            self.send_header("Content-Length", str(len(image)))
+            self.send_header("Cache-Control", "private, max-age=3600")
+            self.end_headers()
+            return self.wfile.write(image)
         if path == "/api/cases":
             cases = []
             for case_id in self.catalog.cases:
@@ -219,7 +465,7 @@ class Handler(BaseHTTPRequestHandler):
             with connection() as con:
                 rows = [dict(row) for row in con.execute("SELECT * FROM review_events ORDER BY id")]
             output = io.StringIO()
-            writer = csv.DictWriter(output, fieldnames=["id", "case_id", "candidate", "decision", "reviewer", "notes", "created_at", "source"])
+            writer = csv.DictWriter(output, fieldnames=["id", "case_id", "candidate", "candidate_sha256", "decision", "reviewer", "reviewer_user_id", "notes", "created_at", "source"])
             writer.writeheader()
             writer.writerows(rows)
             body = output.getvalue().encode("utf-8-sig")
@@ -241,8 +487,8 @@ class Handler(BaseHTTPRequestHandler):
                 return output.getvalue().encode("utf-8-sig")
             stream = io.BytesIO()
             with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-                archive.writestr("reviews.csv", as_csv(reviews, ["id", "case_id", "candidate", "decision", "reviewer", "notes", "created_at", "source"]))
-                archive.writestr("annotations.csv", as_csv(annotations, ["id", "case_id", "candidate", "x", "y", "category", "text", "reviewer", "created_at"]))
+                archive.writestr("reviews.csv", as_csv(reviews, ["id", "case_id", "candidate", "candidate_sha256", "decision", "reviewer", "reviewer_user_id", "notes", "created_at", "source"]))
+                archive.writestr("annotations.csv", as_csv(annotations, ["id", "case_id", "candidate", "candidate_sha256", "x", "y", "category", "text", "reviewer", "reviewer_user_id", "created_at"]))
                 archive.writestr("case_index.json", json.dumps([self.catalog.public_case(case_id) for case_id in self.catalog.cases], ensure_ascii=False, indent=2))
                 archive.writestr("README.txt", "GLADS Golden20 reference review export. The images remain in the verified GLADS-03 archive. These decisions concern Big-LaMa reference candidates only; they are not student-model acceptance or historical ground truth.\n")
             body = stream.getvalue()
@@ -274,6 +520,26 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if path in {"/api/auth/register", "/api/auth/login"}:
+            try:
+                payload = self.body()
+                user = register_user(payload) if path.endswith("register") else login_user(payload)
+                token = new_session(user["id"])
+                return self.json(201 if path.endswith("register") else 200, {"user": user}, self.login_cookie(token))
+            except (ValueError, json.JSONDecodeError) as error:
+                return self.json(400, {"error": str(error)})
+        if path == "/api/auth/logout":
+            clear_session(self.headers.get("Cookie"))
+            return self.json(200, {"ok": True}, "glads_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0")
+        user = self.current_user()
+        if not user:
+            return self.json(401, {"error": "请先登录"})
+        if path == "/api/uploads":
+            try:
+                fields, filename, blob = self.multipart()
+                return self.json(201, save_upload(user, fields, filename, blob))
+            except ValueError as error:
+                return self.json(400, {"error": str(error)})
         parts = path.split("/")
         if len(parts) != 5 or parts[:3] != ["", "api", "cases"] or not CASE_ID.fullmatch(parts[3]):
             return self.json(404, {"error": "Not found"})
@@ -282,9 +548,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.json(404, {"error": "Case not found"})
         try:
             payload = self.body()
+            payload["reviewer"] = user["displayName"]
+            payload["_reviewer_user_id"] = user["id"]
             if parts[4] == "annotations":
                 if not case["variants"].get(payload.get("candidate"), {}).get("image"):
                     raise ValueError("Candidate image unavailable")
+                payload["_candidate_sha256"] = case["variants"][payload["candidate"]]["sha256"]
                 return self.json(201, add_annotation(case["id"], payload))
             if parts[4] == "reviews":
                 return self.json(201, add_review(case, payload))

@@ -91,7 +91,7 @@ export default function ReviewPage() {
   return (
     <PageFrame
       eyebrow="质量与记录"
-      title="审核总览"
+      title="复核记录"
       subtitle="按案例查看风险、判断理由和留存的复核历史。"
       className="page-review"
       actions={
@@ -120,7 +120,7 @@ export default function ReviewPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="搜索案例或复核人"
-              aria-label="搜索审核记录"
+              aria-label="搜索复核记录"
             />
           </label>
         </div>

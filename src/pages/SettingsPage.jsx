@@ -16,7 +16,7 @@ import {
 import { useCases } from "./useCases.js";
 import { DataState, PageFrame } from "./PageParts.jsx";
 
-export default function SettingsPage() {
+export default function SettingsPage({ user }) {
   const { cases, loading, error } = useCases();
   const [preferences, setPreferences] = useState(readPreferences);
   const [health, setHealth] = useState(null);
@@ -50,6 +50,13 @@ export default function SettingsPage() {
     >
       <DataState loading={loading} error={error}>
         <div className="settings-grid">
+          <section className="content-card settings-account">
+            <div className="content-head"><div><span className="eyebrow">ACCOUNT / 账号资料</span><h2>项目成员</h2></div></div>
+            <dl className="source-definition">
+              <div><dt>显示名称</dt><dd>{user.displayName}</dd></div>
+              <div><dt>联系邮箱</dt><dd>{user.email}</dd></div>
+            </dl>
+          </section>
           <section className="content-card settings-main">
             <div className="content-head">
               <div>
@@ -185,7 +192,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <span>03</span>
-                <p>在审核总览筛选记录，回看历史并导出。</p>
+                <p>在复核记录中筛选案例，回看历史并导出。</p>
               </div>
             </div>
           </section>

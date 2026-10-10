@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ArrowRight, FileImage, Filter, Layers3, Search } from "lucide-react";
+import { ArrowRight, FileImage, Filter, Layers3, Search, Upload } from "lucide-react";
 import { useCases } from "./useCases.js";
 import { CaseAnchor, DataState, PageFrame } from "./PageParts.jsx";
+import UploadedAssets from "./UploadedAssets.jsx";
 
 const TYPES = ["全部", "原图", "掩码", "候选"];
 
@@ -34,6 +35,8 @@ function assetsFor(item) {
 
 export default function AssetsPage() {
   const { cases, loading, error } = useCases();
+  const [section, setSection] = useState("cases");
+  const [showUploadForm, setShowUploadForm] = useState(false);
   const [query, setQuery] = useState("");
   const [type, setType] = useState("全部");
   const [selectedId, setSelectedId] = useState(null);
@@ -59,9 +62,15 @@ export default function AssetsPage() {
     <PageFrame
       eyebrow="资料与来源"
       title="素材池"
-      subtitle="以案例为线索，查找原图、执行掩码和各版本候选。"
+      subtitle="查找案例证据，整理壁画图像与来源信息。"
       className="page-assets"
+      actions={<button className="inner-primary-link" onClick={() => { setSection("uploads"); setShowUploadForm(true); }}><Upload size={16} /> 上传素材</button>}
     >
+      <div className="asset-section-tabs" role="tablist" aria-label="素材类型">
+        <button role="tab" aria-selected={section === "cases"} className={section === "cases" ? "active" : ""} onClick={() => setSection("cases")}>Golden20 案例</button>
+        <button role="tab" aria-selected={section === "uploads"} className={section === "uploads" ? "active" : ""} onClick={() => setSection("uploads")}>上传素材</button>
+      </div>
+      {section === "uploads" ? <UploadedAssets showForm={showUploadForm} setShowForm={setShowUploadForm} /> : (
       <DataState loading={loading} error={error}>
         <div className="assets-layout">
           <aside className="content-card asset-browser">
@@ -194,6 +203,7 @@ export default function AssetsPage() {
           </section>
         </div>
       </DataState>
+      )}
     </PageFrame>
   );
 }

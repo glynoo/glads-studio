@@ -19,7 +19,7 @@ import ImageViewer from "./ImageViewer.jsx";
 
 const blankDraft = {
   candidate: null,
-  decision: "approve",
+  decision: "",
   notes: "",
   reviewer: "",
 };
@@ -43,7 +43,7 @@ function caseFromHash() {
   return /^case_\d{4}$/.test(id || "") ? id : null;
 }
 
-export default function Workbench({ active = true }) {
+export default function Workbench({ active = true, user }) {
   const [cases, setCases] = useState([]);
   const [caseId, setCaseId] = useState(null);
   const [item, setItem] = useState(null);
@@ -101,6 +101,9 @@ export default function Workbench({ active = true }) {
       .then((result) => {
         if (!live) return;
         setItem(result);
+        if ((result.semanticRisk || result.riskReasons.length) && stored.decision === "approve") {
+          setDraft({ ...stored, decision: "" });
+        }
         setCandidate(
           result.variants[stored.candidate]?.image
             ? stored.candidate
@@ -172,8 +175,7 @@ export default function Workbench({ active = true }) {
     setModal({ type: "note", point });
   }
   async function commitNote() {
-    if (!note.trim() || !draft.reviewer.trim())
-      return setToast("请填写复核人和批注内容");
+    if (!note.trim()) return setToast("请填写批注内容");
     setBusy(true);
     try {
       await reviewApi.addAnnotation(caseId, {
@@ -182,7 +184,7 @@ export default function Workbench({ active = true }) {
         y: modal.point.y,
         category: noteCategory,
         text: note.trim(),
-        reviewer: draft.reviewer.trim(),
+        reviewer: user.displayName,
       });
       await refreshCase();
       setModal(null);
@@ -194,8 +196,8 @@ export default function Workbench({ active = true }) {
     }
   }
   function prepareReview() {
-    if (!draft.reviewer.trim() || !draft.notes.trim())
-      return setToast("请填写复核人与判断理由");
+    if (!draft.decision) return setToast("请选择复核结论");
+    if (!draft.notes.trim()) return setToast("请填写判断理由");
     if (draft.decision === "approve" && (!selected?.image || hasRisk))
       return setToast("该案例存在风险或候选缺失，请选择拒绝、二次修复或转专家");
     setModal({ type: "review" });
@@ -206,7 +208,7 @@ export default function Workbench({ active = true }) {
       await reviewApi.addReview(caseId, {
         candidate: selected?.image ? candidate : null,
         decision: draft.decision,
-        reviewer: draft.reviewer.trim(),
+        reviewer: user.displayName,
         notes: draft.notes.trim(),
       });
       await refreshCase();
@@ -236,8 +238,8 @@ export default function Workbench({ active = true }) {
   const filtered = cases.filter(
     (entry) =>
       (filter === "全部" ||
-        (filter === "已复核" && entry.latestReview) ||
-        (filter === "待复核" && !entry.latestReview) ||
+        (filter === "已有判断" && entry.latestReview) ||
+        (filter === "待处理" && (!entry.latestReview || ["reject", "secondary_repair_required", "defer_expert"].includes(entry.latestReview.decision))) ||
         (filter === "高风险" && entry.semanticRisk)) &&
       `${entry.id} ${entry.imageName}`
         .toLowerCase()
@@ -319,6 +321,7 @@ export default function Workbench({ active = true }) {
             hasRisk={hasRisk}
             setCandidate={setCandidate}
             updateDraft={updateDraft}
+            reviewer={user.displayName}
           />
         </aside>
       </div>
@@ -412,16 +415,13 @@ export default function Workbench({ active = true }) {
               </label>
               <label className="field-label">
                 复核人
-                <input
-                  value={draft.reviewer}
-                  onChange={(e) => updateDraft({ reviewer: e.target.value })}
-                />
+                <input value={user.displayName} readOnly />
               </label>
               <div className="modal-actions">
                 <button onClick={() => setModal(null)}>取消</button>
                 <button
                   className="primary"
-                  disabled={busy || !note.trim() || !draft.reviewer.trim()}
+                  disabled={busy || !note.trim()}
                   onClick={commitNote}
                 >
                   保存批注
@@ -455,7 +455,7 @@ export default function Workbench({ active = true }) {
                 </div>
                 <div>
                   <dt>复核人</dt>
-                  <dd>{draft.reviewer}</dd>
+                  <dd>{user.displayName}</dd>
                 </div>
                 <div>
                   <dt>依据</dt>

@@ -35,7 +35,7 @@ export default function CaseNavigation({
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         >
-          {["全部", "待复核", "已复核", "高风险"].map((v) => (
+          {["全部", "待处理", "已有判断", "高风险"].map((v) => (
             <option key={v}>{v}</option>
           ))}
         </select>
@@ -60,7 +60,7 @@ export default function CaseNavigation({
         <div className="file-footer">
           <FileImage size={14} />
           {cases.length} 个案例 ·{" "}
-          {cases.filter((c) => c.latestReview).length} 个已复核
+          {cases.filter((c) => c.latestReview).length} 个已有判断
         </div>
       </Panel>
       <Panel
@@ -74,7 +74,7 @@ export default function CaseNavigation({
             {cases.filter((c) => c.latestReview).length}
             <small> / {cases.length}</small>
           </strong>
-          <span>已人工复核</span>
+          <span>已有判断记录</span>
         </div>
         <div className="progress-track">
           <span

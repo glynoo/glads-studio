@@ -197,6 +197,38 @@
   border-color: #b18b6e;
   box-shadow: 0 0 0 2px #d9b99d55;
 }
+.asset-section-tabs { display: flex; gap: 8px; margin: 0 0 18px; }
+.asset-section-tabs button { border: 1px solid #745345; color: #dac6b1; padding: 10px 17px; border-radius: 8px; font-size: 12px; }
+.asset-section-tabs button:hover { background: #52382c; color: #fff2e0; }
+.asset-section-tabs button.active { background: #e8d5b7; border-color: #e8d5b7; color: #4d3124; font-weight: 700; }
+.upload-preview { padding: 18px; display: grid; place-items: center; min-height: 350px; margin-bottom: 16px; }
+.upload-preview img { display: block; max-width: 100%; max-height: 66vh; object-fit: contain; border-radius: 6px; }
+.upload-metadata { padding: 22px 25px; }
+.upload-metadata dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px 26px; }
+.upload-metadata dl div { min-width: 0; border-top: 1px solid #e5dccf; padding-top: 11px; }
+.upload-metadata dt { color: #968674; font-size: 10px; margin-bottom: 6px; }
+.upload-metadata dd { margin: 0; font-size: 12px; word-break: break-word; }
+.upload-note { border-top: 1px solid #e5dccf; margin-top: 20px; padding-top: 14px; font-size: 12px; line-height: 1.6; }
+.upload-empty { min-height: 480px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 17px; padding: 30px; text-align: center; }
+.upload-empty svg { color: #a57c60; }
+.upload-empty h2 { font-family: Georgia, "Songti SC", serif; font-size: 22px; }
+.upload-empty p { color: #8c7d6e; line-height: 1.6; }
+.upload-empty button.inner-primary-link { border: 0; }
+.upload-form { display: grid; gap: 16px; }
+.upload-form > label:not(.upload-drop), .upload-form-grid label { display: grid; gap: 7px; font-size: 12px; font-weight: 700; }
+.upload-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.upload-form input:not([type="file"]), .upload-form textarea { width: 100%; }
+.upload-drop { min-height: 138px; position: relative; border: 1px dashed #bd9b80; border-radius: 9px; background: #f1e7d9; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 9px; color: #754f3d; cursor: pointer; text-align: center; padding: 20px; }
+.upload-drop:hover { background: #ead9c4; }
+.upload-drop span { color: #907f6e; font-size: 11px; }
+.upload-drop input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.upload-drop:focus-within { outline: 2px solid #bd8f60; outline-offset: 3px; }
+.upload-error { color: #a23d31; background: #f8e8e4; border-radius: 7px; padding: 10px 12px; font-size: 12px; line-height: 1.5; }
+.upload-success { color: #3d634c; background: #e8f0e5; border: 1px solid #bfceb8; border-radius: 7px; padding: 10px 12px; margin-bottom: 14px; font-size: 12px; }
+@media (max-width: 680px) {
+  .upload-form-grid, .upload-metadata dl { grid-template-columns: 1fr; }
+  .asset-section-tabs button { flex: 1; }
+}
 
 .home-lead {
   position: relative;
@@ -845,6 +877,7 @@
 .settings-grid .content-head > svg {
   color: #9c7658;
 }
+.settings-account .source-definition { margin-top: 8px; }
 .settings-intro {
   color: #8a7a6b;
   font-size: 11px;
