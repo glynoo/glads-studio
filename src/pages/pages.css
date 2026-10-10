@@ -352,6 +352,7 @@
 }
 .home-dashboard-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; margin:0 0 15px; }
 .home-dashboard-panel { padding:21px 22px; min-height:250px; display:flex; flex-direction:column; }
+.home-dashboard-panel:nth-child(2) { background:#e7e9df; border-color:#d6dccf; }
 .home-dashboard-panel .content-head { margin-bottom:9px; }
 .home-dashboard-panel .content-head h2 { font-size:15px; }
 .home-decision-chart { display:flex; align-items:center; justify-content:space-around; gap:17px; flex:1; }
@@ -490,11 +491,11 @@
   color: #a29486;
 }
 
-.home-layout { display:grid; grid-template-columns:255px minmax(0,1fr); gap:15px; align-items:start; }
+.home-layout { display:grid; grid-template-columns:255px minmax(0,1fr); gap:15px; align-items:stretch; }
 .home-main { min-width:0; }
-.home-my-tasks { padding:21px 15px; position:sticky; top:16px; max-height:calc(100vh - 32px); overflow:auto; }
+.home-my-tasks { display:flex; flex-direction:column; padding:21px 15px; background:#e9ddcc; border-color:#d7c4af; }
 .home-my-tasks .content-head h2 { font-size:17px; }
-.home-todo-group { padding:15px 0 0; border-top:1px solid #e6ddd0; margin-top:15px; }
+.home-todo-group { padding:15px 0 0; border-top:1px solid #cdbba7; margin-top:15px; }
 .home-todo-head { display:flex; justify-content:space-between; align-items:center; gap:7px; margin-bottom:10px; }
 .home-todo-head h3 { margin:0; color:#59493b; font-size:12px; }
 .home-todo-head > span { color:#967f6a; font-size:10px; white-space:nowrap; }
@@ -518,12 +519,14 @@
 .home-my-task-list svg { color:#987359; }
 .home-my-task-foot { display:flex; align-items:center; justify-content:space-between; gap:7px; border-top:1px solid #e6ddd0; padding:13px 0 18px; margin-top:14px; color:#9a8b7a; font-size:9px; }
 .home-my-task-foot a { display:inline-flex; align-items:center; gap:3px; color:#86563d; font-weight:700; }
-.home-sidebar-cases { border-top:1px solid #e6ddd0; padding-top:17px; }
+.home-sidebar-cases { border-top:1px solid #cdbba7; padding-top:17px; }
+.home-sidebar-cases { flex:1; display:flex; flex-direction:column; }
+.home-sidebar-cases > .home-todo-link { margin-top:auto; }
 .home-sidebar-cases .content-head { margin-bottom:10px; }
 .home-sidebar-cases .content-head h2 { font-size:14px; }
-.home-sidebar-case { display:flex; align-items:center; gap:8px; padding:8px 4px; border-top:1px solid #eee8de; }
+.home-sidebar-case { display:flex; align-items:center; gap:8px; padding:8px 4px; border-top:1px solid #d8c8b4; }
 .home-sidebar-case:hover { background:#eee7dc; }
-.home-upload-panel { padding:21px 22px; margin-bottom:15px; }
+.home-upload-panel { padding:21px 22px; margin-bottom:15px; background:#f0e9de; }
 .home-upload-panel .content-head h2 { font-size:17px; }
 .home-upload-panel .content-head p { margin:5px 0 0; color:#8d7e70; font-size:11px; }
 .home-task-summary { display:flex; align-items:center; flex-wrap:wrap; gap:9px; margin:4px 0 13px; }
@@ -551,6 +554,7 @@
 .home-upload-empty { display:flex; align-items:center; justify-content:space-between; gap:15px; min-height:95px; border-top:1px solid #e9e1d6; color:#8c7b69; font-size:11px; }
 .home-upload-empty .inner-primary-link { font-size:10px; padding:9px 11px; }
 .home-bottom-modules .content-card { min-height:220px; }
+.home-bottom-modules .content-card:first-child { background:#f3e1d2; border-color:#e2c8b6; }
 .home-module-intro { color:#8d7e70; font-size:11px; margin:3px 0 16px; }
 .home-bottom-modules .home-risk-list > div { padding:9px 0; font-size:11px; }
 .home-bottom-modules .recent-list strong { font-size:12px; }
@@ -561,9 +565,10 @@
 }
 @media (max-width:850px) {
   .home-layout { grid-template-columns:1fr; }
-  .home-my-tasks { position:static; max-height:none; }
+  .home-my-tasks { display:block; }
   .home-my-task-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .home-sidebar-cases { display:block; }
+  .home-sidebar-case:nth-child(n+6) { display:none; }
 }
 @media (max-width:600px) {
   .home-my-task-list { grid-template-columns:1fr; }

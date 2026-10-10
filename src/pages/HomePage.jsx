@@ -72,7 +72,7 @@ export default function HomePage() {
         Number(!!(b.semanticRisk || b.riskReasons.length)) -
         Number(!!(a.semanticRisk || a.riskReasons.length)),
     )
-    .slice(0, 4);
+    .slice(0, 8);
   const recent = recorded
     .slice()
     .sort((a, b) =>
@@ -387,72 +387,73 @@ export default function HomePage() {
                 </p>
               )}
             </section>
-          </div>
-        </div>
-        <div className="home-columns home-bottom-modules">
-          <section className="content-card">
-            <div className="content-head">
-              <div>
-                <span className="eyebrow">RISK / 证据</span>
-                <h2>风险提示分布</h2>
-              </div>
-              <a href="#/review?filter=risk">
-                查看案例 <ArrowRight size={14} />
-              </a>
-            </div>
-            <p className="home-module-intro">
-              {risk.length} 个案例带有风险提示，按风险类型汇总。
-            </p>
-            {riskCounts.length ? (
-              <div className="home-risk-list">
-                {riskCounts.slice(0, 4).map(([key, count]) => (
-                  <div key={key}>
-                    <span>
-                      {riskLabels[key] ||
-                        (key === "semantic_risk" ? "语义结构风险" : key)}
-                    </span>
-                    <strong>{count}</strong>
+            <div className="home-columns home-bottom-modules">
+              <section className="content-card">
+                <div className="content-head">
+                  <div>
+                    <span className="eyebrow">RISK / 证据</span>
+                    <h2>风险提示分布</h2>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="quiet-empty">当前没有风险提示。</p>
-            )}
-          </section>
-          <section className="content-card">
-            <div className="content-head">
-              <div>
-                <span className="eyebrow">RECENT / 记录</span>
-                <h2>最近人工判断</h2>
-              </div>
-              <a href="#/review?filter=recorded">
-                查看历史 <ArrowRight size={14} />
-              </a>
+                  <a href="#/review?filter=risk">
+                    查看案例 <ArrowRight size={14} />
+                  </a>
+                </div>
+                <p className="home-module-intro">
+                  {risk.length} 个案例带有风险提示，按风险类型汇总。
+                </p>
+                {riskCounts.length ? (
+                  <div className="home-risk-list">
+                    {riskCounts.slice(0, 4).map(([key, count]) => (
+                      <div key={key}>
+                        <span>
+                          {riskLabels[key] ||
+                            (key === "semantic_risk" ? "语义结构风险" : key)}
+                        </span>
+                        <strong>{count}</strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="quiet-empty">当前没有风险提示。</p>
+                )}
+              </section>
+              <section className="content-card">
+                <div className="content-head">
+                  <div>
+                    <span className="eyebrow">RECENT / 记录</span>
+                    <h2>最近人工判断</h2>
+                  </div>
+                  <a href="#/review?filter=recorded">
+                    查看历史 <ArrowRight size={14} />
+                  </a>
+                </div>
+                {recent.length ? (
+                  <div className="recent-list">
+                    {recent.map((item) => (
+                      <article key={item.id}>
+                        <div>
+                          <strong>
+                            {item.id} ·{" "}
+                            {item.latestReview.candidate || "整组候选"}
+                          </strong>
+                          <p>{decisionLabels[item.latestReview.decision]}</p>
+                          <small>
+                            {item.latestReview.reviewer} ·{" "}
+                            {humanTime(item.latestReview.created_at)}
+                          </small>
+                        </div>
+                        <CaseAnchor id={item.id} className="icon-case-link">
+                          查看
+                        </CaseAnchor>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="quiet-empty">尚无人工判断记录。</p>
+                )}
+              </section>
             </div>
-            {recent.length ? (
-              <div className="recent-list">
-                {recent.map((item) => (
-                  <article key={item.id}>
-                    <div>
-                      <strong>
-                        {item.id} · {item.latestReview.candidate || "整组候选"}
-                      </strong>
-                      <p>{decisionLabels[item.latestReview.decision]}</p>
-                      <small>
-                        {item.latestReview.reviewer} ·{" "}
-                        {humanTime(item.latestReview.created_at)}
-                      </small>
-                    </div>
-                    <CaseAnchor id={item.id} className="icon-case-link">
-                      查看
-                    </CaseAnchor>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <p className="quiet-empty">尚无人工判断记录。</p>
-            )}
-          </section>
+          </div>
         </div>
       </DataState>
     </PageFrame>
