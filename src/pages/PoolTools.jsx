@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { Search } from "lucide-react";
 import { Modal } from "../components/UI.jsx";
 import { reviewApi } from "../services/reviewApi.js";
 import { categoryLabels } from "./poolFilters.js";
@@ -61,25 +62,6 @@ export function PoolFilters({
   onReset,
   includeCave = false,
 }) {
-  const [newTag, setNewTag] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const pending = useRef(false);
-  async function addTag() {
-    if (pending.current) return;
-    pending.current = true;
-    setBusy(true);
-    setError("");
-    try {
-      await pool.change({ action: "tag", name: newTag });
-      setNewTag("");
-    } catch (reason) {
-      setError(reason.message);
-    } finally {
-      pending.current = false;
-      setBusy(false);
-    }
-  }
   const set = (key) => (event) =>
     onChange({ ...filters, [key]: event.target.value });
   const tags = [
@@ -139,30 +121,30 @@ export function PoolFilters({
       <button className="text-link" type="button" onClick={onReset}>
         清除筛选
       </button>
-      <label className="pool-filter-tag-create">
-        新标签
-        <div className="pool-tag-input">
+    </div>
+  );
+}
+
+export function PoolToolbar({ navigation, query, onQuery, ...filterProps }) {
+  return (
+    <div className="pool-toolbar">
+      {navigation}
+      <div
+        className="pool-toolbar-controls"
+        role="search"
+        aria-label="素材筛选"
+      >
+        <label className="inline-search pool-toolbar-search">
+          <Search size={16} />
           <input
-            aria-label="新建内容标签"
-            value={newTag}
-            maxLength={40}
-            disabled={busy}
-            onChange={(e) => setNewTag(e.target.value)}
+            value={query}
+            onChange={(event) => onQuery(event.target.value)}
+            placeholder="搜索洞窟、位置或文件名"
+            aria-label="搜索洞窟、位置或文件名"
           />
-          <button
-            type="button"
-            disabled={busy || !newTag.trim()}
-            onClick={addTag}
-          >
-            新建
-          </button>
-        </div>
-      </label>
-      {error && (
-        <p className="upload-error" role="alert">
-          {error}
-        </p>
-      )}
+        </label>
+        <PoolFilters {...filterProps} />
+      </div>
     </div>
   );
 }

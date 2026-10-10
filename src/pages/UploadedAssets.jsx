@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FileImage, ImagePlus, Search } from "lucide-react";
+import { FileImage, ImagePlus } from "lucide-react";
 import { Modal } from "../components/UI.jsx";
 import { reviewApi } from "../services/reviewApi.js";
 import AssetNotesEditor from "./AssetNotesEditor.jsx";
 import UploadDialog from "./UploadDialog.jsx";
-import { PoolFilters } from "./PoolTools.jsx";
+import { PoolToolbar } from "./PoolTools.jsx";
 import { categoryLabels, filterPoolItems } from "./poolFilters.js";
 import {
   AssetHierarchyTree,
@@ -24,6 +24,7 @@ export default function UploadedAssets({
   view,
   projectId,
   onEditCave,
+  navigation,
 }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -182,6 +183,22 @@ export default function UploadedAssets({
 
   return (
     <>
+      <PoolToolbar
+        navigation={navigation}
+        query={query}
+        onQuery={setQuery}
+        items={
+          scopeCave ? items.filter((item) => item.cave === scopeCave) : items
+        }
+        pool={pool}
+        filters={filters}
+        includeCave={!scopeCave}
+        onChange={setFilters}
+        onReset={() => {
+          setQuery("");
+          setFilters({ sort: "recent" });
+        }}
+      />
       <div className="assets-layout uploaded-assets">
         <aside className="content-card asset-browser">
           <div className="content-head">
@@ -193,30 +210,6 @@ export default function UploadedAssets({
               {matchedCount} / {items.length}
             </span>
           </div>
-          <label className="inline-search">
-            <Search size={16} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索洞窟、位置或文件名"
-              aria-label="搜索上传素材"
-            />
-          </label>
-          <PoolFilters
-            items={
-              scopeCave
-                ? items.filter((item) => item.cave === scopeCave)
-                : items
-            }
-            pool={pool}
-            filters={filters}
-            includeCave={!scopeCave}
-            onChange={setFilters}
-            onReset={() => {
-              setQuery("");
-              setFilters({ sort: "recent" });
-            }}
-          />
           {scopeCave &&
             pool.caves.find((cave) => cave.name === scopeCave)?.canEdit && (
               <button

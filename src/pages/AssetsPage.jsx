@@ -120,11 +120,25 @@ export default function AssetsPage({ user }) {
     navigateAssets({ section: "uploads", cave, upload: showForm });
   }
 
+  const navigation = (
+    <PoolNavigation
+      view={route.view}
+      project={route.project}
+      pool={pool}
+      onCreateProject={() => setCreateProject(true)}
+      onNavigate={(view, project) =>
+        navigateAssets({
+          view,
+          project: view === "project" ? project || pool.projects[0]?.id : null,
+        })
+      }
+    />
+  );
+
   return (
     <PageFrame
       eyebrow="资料与来源"
       title="素材池"
-      subtitle="从洞窟进入区域、图片与切片，再查看关联的修复资产。"
       className="page-assets"
       actions={
         <div className="asset-detail-actions">
@@ -144,34 +158,6 @@ export default function AssetsPage({ user }) {
         </div>
       }
     >
-      <div className="asset-path" aria-label="素材位置">
-        <button
-          onClick={() => {
-            navigateAssets();
-          }}
-        >
-          素材池
-        </button>
-        {section === "uploads" && (
-          <>
-            <span>/</span>
-            <span>{activeCave || "上传素材"}</span>
-          </>
-        )}
-      </div>
-      <PoolNavigation
-        view={route.view}
-        project={route.project}
-        pool={pool}
-        onCreateProject={() => setCreateProject(true)}
-        onNavigate={(view, project) =>
-          navigateAssets({
-            view,
-            project:
-              view === "project" ? project || pool.projects[0]?.id : null,
-          })
-        }
-      />
       {pool.error && (
         <p className="upload-error" role="alert">
           {pool.error}{" "}
@@ -181,9 +167,13 @@ export default function AssetsPage({ user }) {
         </p>
       )}
       {["mask", "model", "evidence"].includes(route.view) ? (
-        <ImportedAssets key={route.view} kind={route.view} />
+        <>
+          {navigation}
+          <ImportedAssets key={route.view} kind={route.view} />
+        </>
       ) : section === "overview" ? (
         <AssetOverview
+          navigation={navigation}
           caves={caveGroups}
           loading={uploadLoading}
           error={uploadError}
@@ -198,6 +188,7 @@ export default function AssetsPage({ user }) {
         />
       ) : (
         <UploadedAssets
+          navigation={navigation}
           user={user}
           pool={pool}
           view={route.view}

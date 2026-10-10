@@ -1,12 +1,8 @@
-.page-assets .asset-path {
-  flex-wrap: wrap;
-  overflow-wrap: anywhere;
-}
 .page-assets .pool-navigation {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 18px;
+  gap: 8px;
   margin: 0 0 20px;
   padding-bottom: 10px;
   border-bottom: 1px solid #d7c4af;
@@ -14,14 +10,85 @@
 .page-assets .pool-navigation > button {
   background: transparent;
   border: 0;
-  padding: 7px 0;
-  color: #705d4c;
-  font-size: 13px;
+  padding: 12px 14px;
+  min-height: 44px;
+  color: #dcc9b5;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.page-assets .pool-navigation > button:hover:not(:disabled),
+.page-assets .pool-navigation > button:focus-visible {
+  background: #e9ddcc;
+  color: #4b382b;
 }
 .page-assets .pool-navigation > button[aria-current="page"] {
-  color: #63432e;
+  color: #f1deba;
   box-shadow: inset 0 -2px #987254;
   font-weight: 700;
+}
+.page-assets .pool-navigation > button[aria-current="page"]:hover,
+.page-assets .pool-navigation > button[aria-current="page"]:focus-visible {
+  color: #4b382b;
+}
+.page-assets .pool-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #806657;
+}
+.page-assets .pool-toolbar .pool-navigation {
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 4px;
+}
+.page-assets .pool-toolbar-controls {
+  display: flex;
+  flex: 1 1 680px;
+  align-items: end;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+.page-assets .pool-toolbar-search {
+  flex: 1 1 180px;
+  max-width: 300px;
+  min-height: 42px;
+  margin: 0;
+  background: #f8f1e7;
+}
+.page-assets .pool-toolbar-search input {
+  font-size: 13px;
+}
+.page-assets .pool-toolbar .pool-filters {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+}
+.page-assets .pool-toolbar .pool-filters label {
+  flex: 1 1 90px;
+  color: #dcc9b5;
+}
+.page-assets .pool-toolbar .pool-filters select {
+  min-height: 42px;
+  max-width: 150px;
+  font-size: 13px;
+}
+.page-assets .pool-toolbar .pool-filters > button {
+  min-height: 42px;
+  color: #dcc9b5;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.page-assets .pool-toolbar .pool-filters > button:hover {
+  color: #4b382b;
 }
 .page-assets .pool-filters {
   display: grid;
@@ -56,13 +123,6 @@
   width: auto;
   max-width: 100%;
   font-size: 13px;
-}
-.page-assets .pool-filter-tag-create,
-.page-assets .pool-filters > .upload-error {
-  grid-column: 1 / -1;
-}
-.page-assets .pool-overview-search {
-  margin-top: 16px;
 }
 .page-assets .pool-cave-row {
   min-width: 0;
@@ -194,6 +254,21 @@
   cursor: default;
 }
 @media (max-width: 760px) {
+  .page-assets .pool-toolbar-controls,
+  .page-assets .pool-toolbar .pool-filters {
+    flex-basis: 100%;
+  }
+  .page-assets .pool-toolbar-search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .page-assets .pool-toolbar .pool-filters label {
+    flex-basis: calc(50% - 10px);
+  }
+  .page-assets .pool-toolbar .pool-filters select {
+    max-width: none;
+    font-size: 16px;
+  }
   .page-assets .pool-filters select,
   .page-assets .pool-filters input,
   .page-assets .pool-project-picker,
