@@ -45,11 +45,21 @@ class ReviewApiTest(unittest.TestCase):
         self.assertEqual(item["cave"], "第 17 窟")
         self.assertEqual(item["uploadedBy"], "资料员")
         self.assertEqual(item["mime"], "image/png")
+        self.assertIsNone(item["confirmedAt"])
         self.assertEqual(app.list_uploads()[0]["id"], item["id"])
+        self.assertEqual([entry["id"] for entry in app.list_uploads(user["id"])], [item["id"]])
         self.assertEqual((app.UPLOAD_DIR / (item["id"] + ".png")).read_bytes(), image)
         slice_item = app.save_upload(user, {"parentId": item["id"], "note": "切片"}, "slice.png", image)
         self.assertEqual(slice_item["parentId"], item["id"])
         self.assertEqual(slice_item["cave"], item["cave"])
+        self.assertEqual(len(app.list_uploads(user["id"])), 2)
+        other = app.register_user({"displayName": "其他账号", "email": "other@example.com", "password": "other-pass-123"})
+        self.assertEqual(app.list_uploads(other["id"]), [])
+        with self.assertRaises(ValueError):
+            app.confirm_upload(other, item["id"], True)
+        confirmed = app.confirm_upload(user, item["id"], True)
+        self.assertIsNotNone(confirmed["confirmedAt"])
+        self.assertIsNone(app.confirm_upload(user, item["id"], False)["confirmedAt"])
         with self.assertRaises(ValueError):
             app.save_upload(user, {"parentId": slice_item["id"]}, "nested.png", image)
         with self.assertRaises(ValueError):

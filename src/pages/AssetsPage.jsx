@@ -36,7 +36,7 @@ function assetsFor(item) {
 
 export default function AssetsPage() {
   const { cases, loading, error } = useCases();
-  const [section, setSection] = useState("cases");
+  const [section, setSection] = useState(() => new URLSearchParams(location.hash.split("?")[1] || "").get("section") === "uploads" ? "uploads" : "cases");
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [query, setQuery] = useState("");
   const [type, setType] = useState("全部");

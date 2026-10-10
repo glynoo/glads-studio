@@ -141,7 +141,7 @@ def init_db():
             size INTEGER NOT NULL, sha256 TEXT NOT NULL, cave TEXT NOT NULL,
             mural TEXT NOT NULL, source TEXT NOT NULL, note TEXT NOT NULL,
             uploaded_by INTEGER NOT NULL, created_at TEXT NOT NULL,
-            storage_name TEXT NOT NULL, parent_id TEXT,
+            storage_name TEXT NOT NULL, parent_id TEXT, confirmed_at TEXT,
             FOREIGN KEY(uploaded_by) REFERENCES users(id),
             FOREIGN KEY(parent_id) REFERENCES uploads(id)
         );
@@ -165,6 +165,7 @@ def init_db():
             ("review_events", "candidate_sha256", "TEXT"),
             ("review_events", "reviewer_user_id", "INTEGER"),
             ("uploads", "parent_id", "TEXT"),
+            ("uploads", "confirmed_at", "TEXT"),
         ):
             existing = {row["name"] for row in con.execute(f"PRAGMA table_info({table})")}
             if column not in existing:
@@ -338,7 +339,7 @@ def upload_dict(row):
         "id": row["id"], "filename": row["filename"], "mime": row["mime"], "size": row["size"],
         "sha256": row["sha256"], "cave": row["cave"], "mural": row["mural"], "source": row["source"],
         "note": row["note"], "uploadedAt": row["created_at"], "uploadedBy": row["display_name"],
-        "parentId": row["parent_id"],
+        "parentId": row["parent_id"], "confirmedAt": row["confirmed_at"],
         "imageUrl": f"/api/uploads/{row['id']}/image",
     }
 
@@ -350,11 +351,24 @@ def get_upload(asset_id):
     return upload_dict(row) if row else None
 
 
-def list_uploads():
+def list_uploads(user_id=None):
     with connection() as con:
         rows = con.execute("""SELECT uploads.*, users.display_name FROM uploads JOIN users ON users.id=uploads.uploaded_by
-                              ORDER BY uploads.created_at DESC""").fetchall()
+                              WHERE (? IS NULL OR uploads.uploaded_by=?) ORDER BY uploads.created_at DESC""",
+                           (user_id, user_id)).fetchall()
     return [upload_dict(row) for row in rows]
+
+
+def confirm_upload(user, asset_id, confirmed):
+    if not isinstance(confirmed, bool):
+        raise ValueError("请指定素材核对状态")
+    now = datetime.now(timezone.utc).isoformat() if confirmed else None
+    with DB_LOCK, connection() as con:
+        row = con.execute("SELECT uploaded_by FROM uploads WHERE id=?", (asset_id,)).fetchone()
+        if not row or row["uploaded_by"] != user["id"]:
+            raise ValueError("素材不存在或不属于当前账号")
+        con.execute("UPDATE uploads SET confirmed_at=? WHERE id=?", (now, asset_id))
+    return get_upload(asset_id)
 
 
 def records(case_id):
@@ -487,6 +501,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.json(200, {"items": account_activity(user)})
         if path == "/api/uploads":
             return self.json(200, {"items": list_uploads()})
+        if path == "/api/my-uploads":
+            return self.json(200, {"items": list_uploads(user["id"])})
         upload_match = re.fullmatch(r"/api/uploads/(upload_[0-9a-f]{32})/image", path)
         if upload_match:
             asset_id = upload_match.group(1)
@@ -598,6 +614,13 @@ class Handler(BaseHTTPRequestHandler):
                 fields, filename, blob = self.multipart()
                 return self.json(201, save_upload(user, fields, filename, blob))
             except ValueError as error:
+                return self.json(400, {"error": str(error)})
+        confirmation_match = re.fullmatch(r"/api/uploads/(upload_[0-9a-f]{32})/confirmation", path)
+        if confirmation_match:
+            try:
+                payload = self.body()
+                return self.json(200, confirm_upload(user, confirmation_match.group(1), payload.get("confirmed")))
+            except (ValueError, json.JSONDecodeError) as error:
                 return self.json(400, {"error": str(error)})
         parts = path.split("/")
         if len(parts) != 5 or parts[:3] != ["", "api", "cases"] or not CASE_ID.fullmatch(parts[3]):

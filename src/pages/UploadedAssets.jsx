@@ -10,7 +10,7 @@ export default function UploadedAssets({ showForm, setShowForm }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState(() => new URLSearchParams(location.hash.split("?")[1] || "").get("asset"));
   const [file, setFile] = useState(null);
   const [parentId, setParentId] = useState(null);
   const [fields, setFields] = useState({ cave: "", mural: "", source: "", note: "" });

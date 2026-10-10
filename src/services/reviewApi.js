@@ -38,6 +38,11 @@ export const reviewApi = {
     }),
   exportUrl: "/api/export.zip",
   listUploads: () => request("/api/uploads"),
+  listMyUploads: () => request("/api/my-uploads"),
+  confirmUpload: (id, confirmed) => request(`/api/uploads/${encodeURIComponent(id)}/confirmation`, {
+    method: "POST",
+    body: JSON.stringify({ confirmed }),
+  }),
   upload: async (formData) => {
     let response;
     try {
