@@ -1,0 +1,68 @@
+.page-assets .asset-path {
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+.page-assets .asset-detail-head > div:first-child {
+  min-width: 0;
+  flex: 1 1 220px;
+  overflow-wrap: anywhere;
+}
+.page-assets .asset-cave-identity > div,
+.page-assets .asset-overview-heading > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.page-assets .asset-detail-head .eyebrow,
+.page-assets .modal-caption {
+  overflow-wrap: anywhere;
+}
+.page-assets .upload-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #685545;
+  font-size: 14px;
+}
+.page-assets .upload-error button {
+  display: inline-block;
+  margin: 8px 0 0 12px;
+  padding: 6px 10px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+}
+.page-assets .quiet-empty .text-link {
+  display: block;
+  margin-top: 10px;
+}
+.page-assets .upload-empty p,
+.page-assets .asset-overview-empty span,
+.page-assets .quiet-empty,
+.page-assets .asset-overview-rail > p {
+  color: #705d4c;
+  font-size: 14px;
+}
+.page-assets .upload-drop strong {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.page-assets button:focus-visible,
+.page-assets a:focus-visible {
+  outline: 2px solid #aa724a;
+  outline-offset: 3px;
+}
+@media (max-width: 760px) {
+  .page-assets .upload-form input:not([type="file"]),
+  .page-assets .upload-form textarea,
+  .page-assets .inline-search input {
+    font-size: 16px;
+  }
+  .page-assets .hierarchy-main strong,
+  .page-assets .upload-metadata dd {
+    font-size: 14px;
+  }
+  .page-assets .asset-detail-actions {
+    width: 100%;
+  }
+  .page-assets .asset-detail-actions > * {
+    flex: 1;
+  }
+}

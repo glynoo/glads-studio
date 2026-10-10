@@ -95,7 +95,7 @@ function App() {
         <Workbench active={page === "workbench"} user={user} />
       </div>
       {page === "home" && <HomePage />}
-      {page === "assets" && <AssetsPage />}
+      {page === "assets" && <AssetsPage user={user} />}
       {page === "review" && <ReviewPage />}
       {page === "settings" && <SettingsPage user={user} onUserChanged={setUser} />}
     </>

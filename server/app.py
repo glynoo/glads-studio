@@ -15,6 +15,7 @@ import threading
 import time
 import uuid
 import zipfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from email import policy
 from email.parser import BytesParser
@@ -80,6 +81,7 @@ class ArchiveCatalog:
             self.cases[case_id] = {
                 "id": case_id,
                 "imageName": row["image_name"],
+                "originalSha256": self._original_sha256(case_dir),
                 "categories": row.get("categories", []),
                 "riskReasons": row.get("risk_reasons", []),
                 "semanticRisk": bool(row.get("semantic_risk")),
@@ -104,6 +106,13 @@ class ArchiveCatalog:
                     image_map[key + "_mask"] = ZIP_PREFIX + variant["mask_path"]
             self.cases[case_id]["_images"] = {key: path for key, path in image_map.items() if path in self.names}
 
+    def _original_sha256(self, case_dir):
+        path = case_dir + "original.png"
+        if path not in self.names:
+            return None
+        with zipfile.ZipFile(self.path) as archive:
+            return hashlib.sha256(archive.read(path)).hexdigest()
+
     def public_case(self, case_id):
         case = self.cases.get(case_id)
         return {k: v for k, v in case.items() if not k.startswith("_")} if case else None
@@ -116,12 +125,17 @@ class ArchiveCatalog:
             return archive.read(case["_images"][image_id])
 
 
+@contextmanager
 def connection():
     DATABASE.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DATABASE)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys=ON")
-    return con
+    try:
+        with con:
+            yield con
+    finally:
+        con.close()
 
 
 def init_db():
@@ -340,6 +354,7 @@ def upload_dict(row):
         "sha256": row["sha256"], "cave": row["cave"], "mural": row["mural"], "source": row["source"],
         "note": row["note"], "uploadedAt": row["created_at"], "uploadedBy": row["display_name"],
         "parentId": row["parent_id"], "confirmedAt": row["confirmed_at"],
+        "uploadedById": row["uploaded_by"],
         "imageUrl": f"/api/uploads/{row['id']}/image",
     }
 
@@ -357,6 +372,22 @@ def list_uploads(user_id=None):
                               WHERE (? IS NULL OR uploads.uploaded_by=?) ORDER BY uploads.created_at DESC""",
                            (user_id, user_id)).fetchall()
     return [upload_dict(row) for row in rows]
+
+
+def update_upload_metadata(user, asset_id, payload):
+    if not isinstance(payload, dict) or not isinstance(payload.get("source"), str) or not isinstance(payload.get("note"), str):
+        raise ValueError("请填写图像来源和备注")
+    source, note = payload["source"].strip(), payload["note"].strip()
+    if not source or len(source) > 300 or len(note) > 1000:
+        raise ValueError("来源须为 1 至 300 字，备注不超过 1000 字")
+    with DB_LOCK, connection() as con:
+        row = con.execute("SELECT uploaded_by FROM uploads WHERE id=?", (asset_id,)).fetchone()
+        if not row:
+            raise LookupError("素材不存在")
+        if row["uploaded_by"] != user["id"]:
+            raise PermissionError("仅上传人可以修改素材信息")
+        con.execute("UPDATE uploads SET source=?, note=? WHERE id=?", (source, note, asset_id))
+    return get_upload(asset_id)
 
 
 def confirm_upload(user, asset_id, confirmed):
@@ -614,6 +645,16 @@ class Handler(BaseHTTPRequestHandler):
                 fields, filename, blob = self.multipart()
                 return self.json(201, save_upload(user, fields, filename, blob))
             except ValueError as error:
+                return self.json(400, {"error": str(error)})
+        metadata_match = re.fullmatch(r"/api/uploads/(upload_[0-9a-f]{32})/metadata", path)
+        if metadata_match:
+            try:
+                return self.json(200, update_upload_metadata(user, metadata_match.group(1), self.body()))
+            except PermissionError as error:
+                return self.json(403, {"error": str(error)})
+            except LookupError as error:
+                return self.json(404, {"error": str(error)})
+            except (ValueError, json.JSONDecodeError) as error:
                 return self.json(400, {"error": str(error)})
         confirmation_match = re.fullmatch(r"/api/uploads/(upload_[0-9a-f]{32})/confirmation", path)
         if confirmation_match:

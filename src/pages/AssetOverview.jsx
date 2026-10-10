@@ -7,6 +7,7 @@ export default function AssetOverview({
   error,
   onOpenCave,
   onUpload,
+  onRetry,
 }) {
   const imageCount = caves.reduce((sum, cave) => sum + cave.images.length, 0);
   const sliceCount = caves.reduce((sum, cave) => sum + cave.sliceCount, 0);
@@ -48,13 +49,16 @@ export default function AssetOverview({
         {error && (
           <p className="upload-error" role="alert">
             {error}
+            <button type="button" onClick={onRetry}>
+              重新读取
+            </button>
           </p>
         )}
         {loading ? (
           <div className="content-card asset-overview-empty">
             正在读取洞窟素材…
           </div>
-        ) : caves.length ? (
+        ) : error ? null : caves.length ? (
           <div className="asset-cave-list">
             {caves.map((cave) => (
               <button

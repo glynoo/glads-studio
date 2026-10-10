@@ -5,23 +5,31 @@ import { PageFrame } from "./PageParts.jsx";
 import UploadedAssets from "./UploadedAssets.jsx";
 import AssetOverview from "./AssetOverview.jsx";
 import { reviewApi } from "../services/reviewApi.js";
+import { navigateAssets, useAssetRoute } from "./assetRoute.js";
+import "./assets.css";
 
-export default function AssetsPage() {
+export default function AssetsPage({ user }) {
   const { cases } = useCases();
-  const [section, setSection] = useState(() =>
-    new URLSearchParams(location.hash.split("?")[1] || "").get("section") ===
-    "uploads"
-      ? "uploads"
-      : "overview",
-  );
-  const [activeCave, setActiveCave] = useState(null);
+  const route = useAssetRoute();
+  const section = route.section;
+  const activeCave = route.cave;
   const [uploads, setUploads] = useState([]);
   const [uploadLoading, setUploadLoading] = useState(true);
   const [uploadError, setUploadError] = useState("");
-  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const showUploadForm = route.upload;
+  const setShowUploadForm = (upload) => navigateAssets({ ...route, upload });
 
   const caveGroups = useMemo(() => {
     const caves = new Map();
+    const sliceCounts = new Map();
+    uploads.forEach((asset) => {
+      if (asset.parentId)
+        sliceCounts.set(
+          asset.parentId,
+          (sliceCounts.get(asset.parentId) || 0) + 1,
+        );
+    });
     const parents = uploads.filter((asset) => !asset.parentId);
     parents.forEach((asset) => {
       if (!caves.has(asset.cave)) {
@@ -35,9 +43,7 @@ export default function AssetsPage() {
       const cave = caves.get(asset.cave);
       cave.images.push(asset);
       cave.regions.add(asset.mural);
-      cave.sliceCount += uploads.filter(
-        (slice) => slice.parentId === asset.id,
-      ).length;
+      cave.sliceCount += sliceCounts.get(asset.id) || 0;
     });
     return [...caves.values()];
   }, [uploads]);
@@ -46,6 +52,7 @@ export default function AssetsPage() {
     if (section !== "overview") return;
     let live = true;
     setUploadLoading(true);
+    setUploadError("");
     reviewApi
       .listUploads()
       .then(({ items }) => {
@@ -63,12 +70,10 @@ export default function AssetsPage() {
     return () => {
       live = false;
     };
-  }, [section]);
+  }, [section, reloadKey]);
 
   function showUploads(cave = null, showForm = false) {
-    setActiveCave(cave);
-    setSection("uploads");
-    setShowUploadForm(showForm);
+    navigateAssets({ section: "uploads", cave, upload: showForm });
   }
 
   return (
@@ -89,9 +94,7 @@ export default function AssetsPage() {
       <div className="asset-path" aria-label="素材位置">
         <button
           onClick={() => {
-            setSection("overview");
-            setActiveCave(null);
-            setShowUploadForm(false);
+            navigateAssets();
           }}
         >
           素材池
@@ -108,15 +111,28 @@ export default function AssetsPage() {
           caves={caveGroups}
           loading={uploadLoading}
           error={uploadError}
+          onRetry={() => setReloadKey((value) => value + 1)}
           onOpenCave={(cave) => showUploads(cave)}
           onUpload={() => showUploads(null, true)}
         />
       ) : (
         <UploadedAssets
+          user={user}
           scopeCave={activeCave}
           cases={cases}
           showForm={showUploadForm}
           setShowForm={setShowUploadForm}
+          selectedId={route.asset}
+          onSelect={(asset) =>
+            navigateAssets({ ...route, asset, upload: false })
+          }
+          onUploaded={(asset) =>
+            navigateAssets({
+              section: "uploads",
+              cave: asset.cave,
+              asset: asset.id,
+            })
+          }
         />
       )}
     </PageFrame>
