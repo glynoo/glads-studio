@@ -89,3 +89,10 @@ test("new view deep links preserve project and asset selection", () => {
   assert.equal(readAssetRoute("#/assets?view=favorites").view, "favorites");
   assert.equal(readAssetRoute("#/assets?view=invalid").view, "overview");
 });
+
+test("upload action links open the form in the uploaded-assets view", () => {
+  const route = readAssetRoute("#/assets?section=uploads&upload=1");
+  assert.equal(route.section, "uploads");
+  assert.equal(route.upload, true);
+  assert.equal(readAssetRoute("#/assets?section=uploads").upload, false);
+});

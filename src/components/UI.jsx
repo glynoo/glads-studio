@@ -1,5 +1,6 @@
 import React from "react";
 import { X } from "lucide-react";
+import { handleModalKey } from "./modalFocus.js";
 export function Panel({ title, eyebrow, extra, children, className = "" }) {
   return (
     <section className={`panel ${className}`}>
@@ -16,27 +17,21 @@ export function Panel({ title, eyebrow, extra, children, className = "" }) {
 }
 export function Modal({ title, children, onClose, wide = false }) {
   const ref = React.useRef();
+  const closeRef = React.useRef(onClose);
+  React.useLayoutEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
   React.useEffect(() => {
     const prev = document.activeElement;
     ref.current?.focus();
     const listener = (e) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "Tab") {
-        const els = [
-          ...ref.current.querySelectorAll(
-            'button,input,textarea,select,[tabindex="0"]',
-          ),
-        ];
-        const first = els[0],
-          last = els.at(-1);
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
+      if (ref.current)
+        handleModalKey(
+          e,
+          ref.current,
+          () => closeRef.current(),
+          document.activeElement,
+        );
     };
     document.addEventListener("keydown", listener);
     return () => {

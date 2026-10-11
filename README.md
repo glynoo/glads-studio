@@ -7,7 +7,7 @@
 需要 Node.js 20.19+、Python 3.9+，以及同级目录 `GLADS_v1.0交付包/GLADS-03-Golden20-Reference-v1.0_20260810.zip`。
 
 ```sh
-cd glads-workbench
+cd glads-studio
 npm install
 npm run dev
 ```
@@ -33,6 +33,16 @@ npm run dev
 Windows 启动与测试默认使用 `python`，其他系统默认使用 `python3`。可用 `GLADS_PYTHON` 指定解释器路径。素材池洞窟和图片选择会同步到地址栏，支持刷新恢复、直接链接和浏览器前进后退；读取失败时可点击“重新读取”。
 
 ## 协作结构
+
+团队协作以 `feature/remaining-pages` 为基线，每位成员使用自己的功能分支；不要直接修改或推送 `main`。首次克隆可运行：
+
+```sh
+git clone --branch feature/remaining-pages --single-branch https://github.com/glynoo/glads-studio.git
+cd glads-studio
+git switch -c feature/your-name
+```
+
+修改后运行构建和测试，再执行 `git push -u origin feature/your-name`，向 `feature/remaining-pages` 提交 PR，由团队审核后统一合并。已有个人功能分支时继续在该分支工作。推送需要仓库协作者写权限；没有写权限时可通过 fork 提交 PR。无需把 Golden20 ZIP、上传文件或本地数据库提交到仓库。
 
 原版掩码、模型、运行证据目录通过可选配置 `GLADS_MATERIAL_POOL_DIR` 连接。该变量指向原版 `assets/glads/` 目录，里面须包含 `catalog.json`。例如 PowerShell 中先设置 `$env:GLADS_MATERIAL_POOL_DIR='D:/material-pool/assets/glads'`，再启动服务。目录中的图片和证据文件仅通过登录后的 API 读取，按 24 项分页搜索；模型只登记元数据时不会提供下载。未配置目录时页面显示明确错误与重试入口。大批原始文件及模型权重不提交到 Git。
 

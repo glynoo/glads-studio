@@ -131,7 +131,10 @@ export default function HomePage() {
       subtitle="待办、复核与素材入库"
       className="page-home"
       actions={
-        <a className="inner-primary-link" href="#/assets?section=uploads">
+        <a
+          className="inner-primary-link"
+          href="#/assets?section=uploads&upload=1"
+        >
           上传素材 <ArrowRight size={16} />
         </a>
       }
@@ -375,7 +378,7 @@ export default function HomePage() {
                   <p>上传图片后，素材入库状态会显示在这里。</p>
                   <a
                     className="inner-primary-link"
-                    href="#/assets?section=uploads"
+                    href="#/assets?section=uploads&upload=1"
                   >
                     上传素材 <ArrowRight size={14} />
                   </a>
