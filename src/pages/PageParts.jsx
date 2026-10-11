@@ -17,7 +17,7 @@ export function PageFrame({
         <div>
           <div className="inner-breadcrumb">GLADS Restore / {eyebrow}</div>
           <h1>{title}</h1>
-          <p>{subtitle}</p>
+          {subtitle && <p>{subtitle}</p>}
         </div>
         {actions && <div className="inner-actions">{actions}</div>}
       </div>

@@ -1,4 +1,6 @@
 import tempfile
+import sqlite3
+import hashlib
 import unittest
 from pathlib import Path
 import app
@@ -37,6 +39,16 @@ class ReviewApiTest(unittest.TestCase):
         app.clear_session(cookie)
         self.assertIsNone(app.user_from_cookie(cookie))
 
+    def test_connection_closes_and_rolls_back_failed_transaction(self):
+        with self.assertRaises(RuntimeError):
+            with app.connection() as con:
+                con.execute("INSERT INTO users(display_name,email,password_salt,password_hash,created_at) VALUES(?,?,?,?,?)", ("回滚", "rollback@example.com", b"salt", b"hash", "now"))
+                raise RuntimeError("Abort transaction")
+        with self.assertRaises(sqlite3.ProgrammingError):
+            con.execute("SELECT 1")
+        with app.connection() as fresh:
+            self.assertEqual(fresh.execute("SELECT COUNT(*) FROM users").fetchone()[0], 0)
+
     def test_upload_keeps_source_and_validates_file(self):
         user = app.register_user({"displayName": "资料员", "email": "asset@example.com", "password": "upload-pass-123"})
         image = self.catalog.image("case_0001", "original")
@@ -67,6 +79,32 @@ class ReviewApiTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             app.save_upload(user, {**fields, "source": ""}, "mural.png", image)
 
+    def test_upload_metadata_is_persisted_without_changing_image(self):
+        user = app.register_user({"displayName": "资料员", "email": "notes@example.com", "password": "upload-pass-123"})
+        image = self.catalog.image("case_0001", "original")
+        item = app.save_upload(user, {"cave": "第 103 窟", "mural": "西壁", "source": "原始来源"}, "mural.png", image)
+        updated = app.update_upload_metadata(user, item["id"], {"source": "  采集档案  ", "note": "  第一行\n第二行  "})
+        reread = app.list_uploads()[0]
+        self.assertEqual(reread["note"], "第一行\n第二行")
+        self.assertEqual(reread["source"], "采集档案")
+        self.assertEqual(reread["uploadedById"], user["id"])
+        self.assertEqual(updated["sha256"], item["sha256"])
+        self.assertEqual((app.UPLOAD_DIR / (item["id"] + ".png")).read_bytes(), image)
+        self.assertEqual(app.update_upload_metadata(user, item["id"], {"source": "采集档案", "note": ""})["note"], "")
+
+    def test_upload_metadata_checks_owner_and_invalid_fields(self):
+        owner = app.register_user({"displayName": "上传人", "email": "owner@example.com", "password": "upload-pass-123"})
+        other = app.register_user({"displayName": "其他成员", "email": "reader@example.com", "password": "upload-pass-123"})
+        item = app.save_upload(owner, {"cave": "第 103 窟", "mural": "西壁", "source": "原始来源", "note": "保留"}, "mural.png", self.catalog.image("case_0001", "original"))
+        with self.assertRaises(PermissionError):
+            app.update_upload_metadata(other, item["id"], {"source": "修改来源", "note": "覆盖"})
+        with self.assertRaises(LookupError):
+            app.update_upload_metadata(owner, "upload_" + "0" * 32, {"source": "修改来源", "note": ""})
+        for payload in (None, {}, {"source": " ", "note": ""}, {"source": "a" * 301, "note": ""}, {"source": "来源", "note": "a" * 1001}, {"source": "来源", "note": 123}):
+            with self.assertRaises(ValueError):
+                app.update_upload_metadata(owner, item["id"], payload)
+        self.assertEqual(app.get_upload(item["id"])["note"], "保留")
+
     def test_account_profile_and_password_change(self):
         user = app.register_user({"displayName": "原名称", "email": "profile@example.com", "password": "original-pass-123"})
         updated = app.update_profile(user, {"displayName": "新名称"})
@@ -78,6 +116,7 @@ class ReviewApiTest(unittest.TestCase):
 
     def test_catalog_has_real_cases_and_marks_missing_images(self):
         self.assertEqual(len(self.catalog.cases), 20)
+        self.assertEqual(self.catalog.public_case("case_0001")["originalSha256"], hashlib.sha256(self.catalog.image("case_0001", "original")).hexdigest())
         self.assertIsNotNone(self.catalog.public_case("case_0001")["variants"]["R3"]["image"])
         self.assertIsNone(self.catalog.public_case("case_0006")["variants"]["R12"]["image"])
         self.assertIsNone(self.catalog.public_case("case_0009")["variants"]["R12"]["image"])

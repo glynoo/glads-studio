@@ -1,0 +1,346 @@
+.page-assets .pool-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #d7c4af;
+}
+.page-assets .pool-navigation > button {
+  background: transparent;
+  border: 0;
+  padding: 12px 14px;
+  min-height: 44px;
+  color: #dcc9b5;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.page-assets .pool-navigation > button:hover:not(:disabled),
+.page-assets .pool-navigation > button:focus-visible {
+  background: #e9ddcc;
+  color: #4b382b;
+}
+.page-assets .pool-navigation > button[aria-current="page"] {
+  color: #f1deba;
+  box-shadow: inset 0 -2px #987254;
+  font-weight: 700;
+}
+.page-assets .pool-navigation > button[aria-current="page"]:hover,
+.page-assets .pool-navigation > button[aria-current="page"]:focus-visible {
+  color: #4b382b;
+}
+.page-assets .pool-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #806657;
+}
+.page-assets .pool-toolbar .pool-navigation {
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 4px;
+}
+.page-assets .pool-toolbar-controls {
+  display: flex;
+  flex: 1 1 680px;
+  align-items: end;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+.page-assets .pool-toolbar-search {
+  flex: 1 1 180px;
+  max-width: 300px;
+  min-height: 42px;
+  margin: 0;
+  background: #f8f1e7;
+}
+.page-assets .pool-toolbar-search input {
+  font-size: 13px;
+}
+.page-assets .pool-toolbar .pool-filters {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+}
+.page-assets .pool-toolbar .pool-filters label {
+  flex: 1 1 90px;
+  color: #dcc9b5;
+}
+.page-assets .pool-toolbar .pool-filters select {
+  min-height: 42px;
+  max-width: 150px;
+  font-size: 13px;
+}
+.page-assets .pool-toolbar .pool-filters > button {
+  min-height: 42px;
+  color: #dcc9b5;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.page-assets .pool-toolbar .pool-filters > button:hover {
+  color: #4b382b;
+}
+.page-assets .pool-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.page-assets .pool-filters label,
+.page-assets .pool-new-cave label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  color: #705d4c;
+  font-size: 12px;
+}
+.page-assets .pool-filters select,
+.page-assets .pool-filters input,
+.page-assets .pool-navigation select,
+.page-assets .pool-project-picker,
+.page-assets .upload-form select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d7c4af;
+  border-radius: 6px;
+  background: #f8f1e7;
+  color: #4b382b;
+  padding: 9px;
+  font: inherit;
+}
+.page-assets .pool-navigation select,
+.page-assets .pool-project-picker {
+  width: auto;
+  max-width: 100%;
+  font-size: 13px;
+}
+.page-assets .pool-cave-row {
+  min-width: 0;
+}
+.page-assets .pool-cave-row .asset-cave-folder {
+  width: 100%;
+}
+.page-assets .pool-cave-edit {
+  display: block;
+  margin: 6px 0 0 auto;
+  font-size: 12px;
+}
+.page-assets .pool-tags {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.page-assets .pool-tags legend {
+  padding: 0;
+  margin-bottom: 8px;
+  color: #705d4c;
+  font-size: 12px;
+  font-weight: 700;
+}
+.page-assets .pool-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.page-assets .pool-tag-list button,
+.page-assets .pool-tag-list > span {
+  padding: 5px 8px;
+  border: 1px solid #d7c4af;
+  border-radius: 5px;
+  color: #705d4c;
+  background: #f8f1e7;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.page-assets .pool-tag-list button[aria-pressed="true"] {
+  background: #63432e;
+  color: #f8f1e7;
+}
+.page-assets .pool-tag-input {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.page-assets .pool-tag-input input {
+  flex: 1;
+  min-width: 0;
+}
+.page-assets .pool-tag-input button {
+  flex-shrink: 0;
+  color: #63432e;
+  font-size: 12px;
+}
+.page-assets .pool-upload-queue {
+  max-height: 240px;
+  overflow: auto;
+}
+.page-assets .pool-upload-queue > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #d7c4af;
+}
+.page-assets .pool-upload-queue img {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 5px;
+}
+.page-assets .pool-upload-queue span {
+  flex: 1;
+  min-width: 0;
+}
+.page-assets .pool-upload-queue strong,
+.page-assets .pool-upload-queue small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.page-assets .pool-upload-queue strong {
+  font-size: 13px;
+}
+.page-assets .pool-upload-queue small,
+.page-assets .pool-upload-queue p {
+  color: #705d4c;
+  font-size: 12px;
+}
+.page-assets .pool-new-cave {
+  display: grid;
+  gap: 10px;
+}
+.page-assets .pool-library-item {
+  text-align: left;
+  cursor: pointer;
+}
+.page-assets .pool-preview-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.page-assets .pool-library-item h3,
+.page-assets .pool-library-item p {
+  overflow-wrap: anywhere;
+}
+.page-assets .pool-library-item .asset-image {
+  display: grid;
+  place-items: center;
+}
+.page-assets .pool-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin: 20px 0;
+  color: #705d4c;
+  font-size: 13px;
+}
+.page-assets button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+@media (max-width: 760px) {
+  .page-assets .pool-toolbar-controls,
+  .page-assets .pool-toolbar .pool-filters {
+    flex-basis: 100%;
+  }
+  .page-assets .pool-toolbar-search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .page-assets .pool-toolbar .pool-filters label {
+    flex-basis: calc(50% - 10px);
+  }
+  .page-assets .pool-toolbar .pool-filters select {
+    max-width: none;
+    font-size: 16px;
+  }
+  .page-assets .pool-filters select,
+  .page-assets .pool-filters input,
+  .page-assets .pool-project-picker,
+  .page-assets .pool-navigation select,
+  .page-assets .upload-form select {
+    font-size: 16px;
+  }
+  .page-assets .pool-project-picker {
+    width: 100%;
+  }
+}
+.page-assets .asset-detail-head > div:first-child {
+  min-width: 0;
+  flex: 1 1 220px;
+  overflow-wrap: anywhere;
+}
+.page-assets .asset-cave-identity > div,
+.page-assets .asset-overview-heading > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.page-assets .asset-detail-head .eyebrow,
+.page-assets .modal-caption {
+  overflow-wrap: anywhere;
+}
+.page-assets .upload-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #685545;
+  font-size: 14px;
+}
+.page-assets .upload-error button {
+  display: inline-block;
+  margin: 8px 0 0 12px;
+  padding: 6px 10px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+}
+.page-assets .quiet-empty .text-link {
+  display: block;
+  margin-top: 10px;
+}
+.page-assets .upload-empty p,
+.page-assets .asset-overview-empty span,
+.page-assets .quiet-empty,
+.page-assets .asset-overview-rail > p {
+  color: #705d4c;
+  font-size: 14px;
+}
+.page-assets .upload-drop strong {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.page-assets button:focus-visible,
+.page-assets a:focus-visible {
+  outline: 2px solid #aa724a;
+  outline-offset: 3px;
+}
+@media (max-width: 760px) {
+  .page-assets .upload-form input:not([type="file"]),
+  .page-assets .upload-form textarea,
+  .page-assets .inline-search input {
+    font-size: 16px;
+  }
+  .page-assets .hierarchy-main strong,
+  .page-assets .upload-metadata dd {
+    font-size: 14px;
+  }
+  .page-assets .asset-detail-actions {
+    width: 100%;
+  }
+  .page-assets .asset-detail-actions > * {
+    flex: 1;
+  }
+}

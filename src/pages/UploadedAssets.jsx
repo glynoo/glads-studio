@@ -1,7 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { FileImage, ImagePlus, Search } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { FileImage, ImagePlus } from "lucide-react";
 import { Modal } from "../components/UI.jsx";
 import { reviewApi } from "../services/reviewApi.js";
+import AssetNotesEditor from "./AssetNotesEditor.jsx";
+import UploadDialog from "./UploadDialog.jsx";
+import { PoolToolbar } from "./PoolTools.jsx";
+import { categoryLabels, filterPoolItems } from "./poolFilters.js";
 import {
   AssetHierarchyTree,
   uploadedHierarchy,
@@ -12,36 +16,39 @@ export default function UploadedAssets({
   cases = [],
   showForm,
   setShowForm,
+  selectedId,
+  onSelect,
+  onUploaded,
+  user,
+  pool,
+  view,
+  projectId,
+  onEditCave,
+  navigation,
 }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(() =>
-    new URLSearchParams(location.hash.split("?")[1] || "").get("asset"),
-  );
-  const [file, setFile] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [formError, setFormError] = useState("");
+  const [editing, setEditing] = useState(false);
   const [parentId, setParentId] = useState(null);
-  const [fields, setFields] = useState({
-    cave: scopeCave || "",
-    mural: "",
-    source: "",
-    note: "",
-  });
-  const [busy, setBusy] = useState(false);
-
+  const [filters, setFilters] = useState({ sort: "recent" });
+  const [deleting, setDeleting] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [operationError, setOperationError] = useState("");
+  const mutation = useRef(false);
   useEffect(() => {
-    if (!showForm) {
-      setParentId(null);
-      setFile(null);
-      setFields({ cave: scopeCave || "", mural: "", source: "", note: "" });
-      setError("");
-    }
-  }, [showForm, scopeCave]);
+    if (!showForm) setParentId(null);
+  }, [showForm]);
 
   useEffect(() => {
     let live = true;
+    setLoading(true);
+    setError("");
     reviewApi
       .listUploads()
       .then(({ items }) => {
@@ -59,35 +66,30 @@ export default function UploadedAssets({
     return () => {
       live = false;
     };
-  }, []);
+  }, [reloadKey, scopeCave]);
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    const scoped = scopeCave
-      ? items.filter((item) => item.cave === scopeCave)
-      : items;
-    if (!needle) return scoped;
-    const matched = new Set(
-      scoped
-        .filter((item) =>
-          `${item.filename} ${item.cave} ${item.mural} ${item.source}`
-            .toLowerCase()
-            .includes(needle),
-        )
-        .map((item) => item.id),
-    );
-    scoped.forEach((item) => {
-      if (item.parentId && matched.has(item.id)) matched.add(item.parentId);
-    });
-    return scoped.filter(
-      (item) =>
-        matched.has(item.id) || (item.parentId && matched.has(item.parentId)),
-    );
-  }, [items, query, scopeCave]);
+  useEffect(() => {
+    setQuery("");
+    setEditing(false);
+  }, [scopeCave]);
+
+  const project = pool.projects.find((item) => item.id === projectId);
+  const { items: filtered, count: matchedCount } = useMemo(
+    () =>
+      filterPoolItems(items, {
+        ...filters,
+        query,
+        cave: scopeCave || filters.cave,
+        view,
+        favorites: pool.favorites,
+        project,
+      }),
+    [items, query, scopeCave, filters, view, pool.favorites, project],
+  );
   const hierarchy = useMemo(() => uploadedHierarchy(filtered), [filtered]);
   const selected =
     filtered.find((item) => item.id === selectedId) ||
-    (scopeCave ? null : filtered[0]);
+    (scopeCave || selectedId ? null : filtered[0]);
   const regions = useMemo(() => {
     const groups = new Map();
     filtered
@@ -105,7 +107,7 @@ export default function UploadedAssets({
   const relatedCase = sourceImage
     ? cases.find(
         (item) =>
-          item.imageName.toLowerCase() === sourceImage.filename.toLowerCase(),
+          item.originalSha256 && item.originalSha256 === sourceImage.sha256,
       )
     : null;
   const processedAssets = relatedCase
@@ -131,47 +133,72 @@ export default function UploadedAssets({
 
   function addSlice(parent) {
     setParentId(parent.id);
-    setFields({
-      cave: parent.cave,
-      mural: parent.mural,
-      source: parent.source,
-      note: "",
-    });
-    setFile(null);
-    setError("");
     setShowForm(true);
   }
 
-  function change(key, value) {
-    setFields((current) => ({ ...current, [key]: value }));
+  async function changeCollection(value) {
+    if (mutation.current) return;
+    mutation.current = true;
+    setActionBusy(true);
+    setOperationError("");
+    try {
+      await pool.change(value);
+      if (
+        !value.enabled &&
+        ((view === "favorites" && value.action === "favorite") ||
+          (view === "project" &&
+            value.action === "projectMember" &&
+            value.projectId === projectId))
+      )
+        onSelect(null);
+    } catch (reason) {
+      setOperationError(reason.message);
+    } finally {
+      mutation.current = false;
+      setActionBusy(false);
+    }
   }
 
-  async function submit(event) {
-    event.preventDefault();
-    if (!file) return setError("请选择图片文件");
-    setBusy(true);
-    setError("");
+  async function deleteSelected() {
+    if (mutation.current || !selected) return;
+    mutation.current = true;
+    setActionBusy(true);
+    setOperationError("");
     try {
-      const form = new FormData();
-      form.append("file", file);
-      Object.entries(fields).forEach(([key, value]) => form.append(key, value));
-      if (parentId) form.append("parentId", parentId);
-      const uploaded = await reviewApi.upload(form);
-      setItems((current) => [uploaded, ...current]);
-      setSelectedId(uploaded.id);
-      setShowForm(false);
-      setFile(null);
-      setFields({ cave: scopeCave || "", mural: "", source: "", note: "" });
-      setMessage("图片已保存到素材池");
+      const result = await reviewApi.deleteUpload(selected.id);
+      setItems((old) =>
+        old.filter((item) => !result.deleted.includes(item.id)),
+      );
+      await pool.reload();
+      setDeleting(false);
+      onSelect(null);
+      setMessage("素材已删除");
     } catch (reason) {
-      setError(reason.message);
+      setOperationError(reason.message);
     } finally {
-      setBusy(false);
+      mutation.current = false;
+      setActionBusy(false);
     }
   }
 
   return (
     <>
+      <PoolToolbar
+        navigation={navigation}
+        query={query}
+        onQuery={setQuery}
+        items={
+          scopeCave ? items.filter((item) => item.cave === scopeCave) : items
+        }
+        pool={pool}
+        filters={filters}
+        includeCave={!scopeCave}
+        onChange={setFilters}
+        onReset={() => {
+          setQuery("");
+          setFilters({ sort: "recent" });
+        }}
+      />
       <div className="assets-layout uploaded-assets">
         <aside className="content-card asset-browser">
           <div className="content-head">
@@ -180,48 +207,68 @@ export default function UploadedAssets({
               <h2>洞窟 / 区域 / 图片 / 切片</h2>
             </div>
             <span className="soft-count">
-              {filtered.length} / {items.length}
+              {matchedCount} / {items.length}
             </span>
           </div>
-          <label className="inline-search">
-            <Search size={16} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索洞窟、位置或文件名"
-              aria-label="搜索上传素材"
-            />
-          </label>
+          {scopeCave &&
+            pool.caves.find((cave) => cave.name === scopeCave)?.canEdit && (
+              <button
+                className="text-link"
+                onClick={() =>
+                  onEditCave(pool.caves.find((cave) => cave.name === scopeCave))
+                }
+              >
+                编辑洞窟资料
+              </button>
+            )}
           <div className="asset-case-list">
             {loading && <p className="quiet-empty">正在读取素材…</p>}
-            {!loading && error && !showForm && (
+            {!loading && error && (
               <p className="upload-error" role="alert">
                 {error}
+                <button
+                  type="button"
+                  onClick={() => setReloadKey((value) => value + 1)}
+                >
+                  重新读取
+                </button>
               </p>
             )}
             {!loading && !filtered.length && !error && (
               <p className="quiet-empty">
-                这里还没有图像。使用“上传素材”添加第一张。
+                {query.trim()
+                  ? "没有匹配的素材，请更换关键词。"
+                  : "这里还没有图像。使用“上传素材”添加第一张。"}
+                {query.trim() && (
+                  <button className="text-link" onClick={() => setQuery("")}>
+                    清除搜索
+                  </button>
+                )}
               </p>
             )}
             {!!filtered.length && (
               <AssetHierarchyTree
                 nodes={hierarchy}
                 selectedId={selected?.id}
-                onSelect={setSelectedId}
+                onSelect={onSelect}
               />
             )}
           </div>
         </aside>
         <section className="asset-detail">
+          {operationError && (
+            <p role="alert" className="upload-error">
+              {operationError}
+            </p>
+          )}
           {message && (
             <p className="upload-success" role="status">
               {message}
             </p>
           )}
-          {scopeCave && loading && !selected ? (
+          {loading && !selected ? (
             <div className="content-card asset-overview-empty">
-              正在读取 {scopeCave} 的素材…
+              正在读取{scopeCave ? ` ${scopeCave} 的` : ""}素材…
             </div>
           ) : selected ? (
             <>
@@ -238,6 +285,66 @@ export default function UploadedAssets({
                   </p>
                 </div>
                 <div className="asset-detail-actions">
+                  <button
+                    type="button"
+                    className="inner-primary-link"
+                    aria-pressed={pool.favorites.includes(selected.id)}
+                    disabled={actionBusy || pool.loading}
+                    onClick={() =>
+                      changeCollection({
+                        action: "favorite",
+                        assetId: selected.id,
+                        enabled: !pool.favorites.includes(selected.id),
+                      })
+                    }
+                  >
+                    {pool.favorites.includes(selected.id)
+                      ? "取消收藏"
+                      : "加入收藏"}
+                  </button>
+                  {!!pool.projects.length && (
+                    <select
+                      className="pool-project-picker"
+                      aria-label="将素材加入或移出项目"
+                      value=""
+                      disabled={actionBusy}
+                      onChange={(e) => {
+                        const p = pool.projects.find(
+                          (item) => item.id === e.target.value,
+                        );
+                        if (p)
+                          changeCollection({
+                            action: "projectMember",
+                            assetId: selected.id,
+                            projectId: p.id,
+                            enabled: !p.assetIds.includes(selected.id),
+                          });
+                      }}
+                    >
+                      <option value="">加入或移出项目</option>
+                      {pool.projects.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                          {p.assetIds.includes(selected.id)
+                            ? "（点击移出）"
+                            : "（点击加入）"}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {selected.uploadedById === user?.id && (
+                    <button
+                      type="button"
+                      className="text-link"
+                      disabled={actionBusy}
+                      onClick={() => {
+                        setOperationError("");
+                        setDeleting(true);
+                      }}
+                    >
+                      删除素材
+                    </button>
+                  )}
                   {!selected.parentId && (
                     <button
                       className="inner-primary-link"
@@ -256,10 +363,17 @@ export default function UploadedAssets({
                 </div>
               </div>
               <div className="content-card upload-preview">
-                <img
-                  src={selected.imageUrl}
-                  alt={`${selected.cave} ${selected.mural} 上传图像`}
-                />
+                <button
+                  className="pool-preview-open"
+                  type="button"
+                  aria-label="查看图片大图"
+                  onClick={() => setPreviewing(true)}
+                >
+                  <img
+                    src={selected.imageUrl}
+                    alt={`${selected.cave} ${selected.mural} 上传图像`}
+                  />
+                </button>
               </div>
               <div className="content-card upload-metadata">
                 <div className="content-head">
@@ -303,8 +417,29 @@ export default function UploadedAssets({
                     </dd>
                   </div>
                 </dl>
-                {selected.note && (
-                  <p className="upload-note">{selected.note}</p>
+                <div className="pool-tag-list">
+                  {(selected.tags || []).map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => {
+                        setFilters({ ...filters, tag });
+                        onSelect(null);
+                      }}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                  <span>{categoryLabels[selected.category || "original"]}</span>
+                </div>
+                <p className="upload-note">{selected.note || "暂无备注"}</p>
+                {selected.uploadedById === user?.id && (
+                  <button
+                    className="text-link"
+                    onClick={() => setEditing(true)}
+                  >
+                    编辑素材信息与标签
+                  </button>
                 )}
               </div>
               {!!processedAssets.length && (
@@ -348,10 +483,7 @@ export default function UploadedAssets({
                   </div>
                   <div>
                     {children.map((slice) => (
-                      <button
-                        key={slice.id}
-                        onClick={() => setSelectedId(slice.id)}
-                      >
+                      <button key={slice.id} onClick={() => onSelect(slice.id)}>
                         <img src={slice.imageUrl} alt="" />
                         <span>{slice.filename}</span>
                       </button>
@@ -381,10 +513,7 @@ export default function UploadedAssets({
                   </div>
                   <div className="asset-region-images">
                     {images.map((image) => (
-                      <button
-                        key={image.id}
-                        onClick={() => setSelectedId(image.id)}
-                      >
+                      <button key={image.id} onClick={() => onSelect(image.id)}>
                         <img src={image.imageUrl} alt="" loading="lazy" />
                         <span>{image.filename}</span>
                       </button>
@@ -392,6 +521,45 @@ export default function UploadedAssets({
                   </div>
                 </section>
               ))}
+            </div>
+          ) : error ? (
+            <div className="content-card asset-overview-empty">
+              <strong>素材读取失败</strong>
+              <span>{error}</span>
+              <button onClick={() => setReloadKey((value) => value + 1)}>
+                重新读取
+              </button>
+            </div>
+          ) : query.trim() ||
+            filters.mural ||
+            filters.category ||
+            filters.tag ||
+            view === "favorites" ||
+            view === "project" ? (
+            <div className="content-card asset-overview-empty">
+              <Search size={31} />
+              <strong>
+                {view === "favorites"
+                  ? "还没有匹配的收藏"
+                  : view === "project"
+                    ? "此项目还没有匹配的素材"
+                    : "没有匹配的素材"}
+              </strong>
+              <span>试试洞窟、区域、文件名、来源或备注。</span>
+              <button
+                onClick={() => {
+                  setQuery("");
+                  setFilters({ sort: "recent" });
+                }}
+              >
+                清除筛选
+              </button>
+            </div>
+          ) : selectedId ? (
+            <div className="content-card asset-overview-empty">
+              <strong>当前素材无法找到</strong>
+              <span>素材可能不在当前洞窟中，请返回洞窟列表查看。</span>
+              <button onClick={() => onSelect(null)}>返回图片列表</button>
             </div>
           ) : (
             <div className="content-card upload-empty">
@@ -408,95 +576,89 @@ export default function UploadedAssets({
           )}
         </section>
       </div>
-      {showForm && (
+      {editing && selected && (
+        <AssetNotesEditor
+          key={selected.id}
+          asset={selected}
+          availableTags={[
+            ...new Set([
+              ...pool.tags,
+              ...items.flatMap((item) => item.tags || []),
+            ]),
+          ]}
+          onClose={() => setEditing(false)}
+          onSaved={(updated) => {
+            setItems((current) =>
+              current.map((item) => (item.id === updated.id ? updated : item)),
+            );
+            setMessage("来源与备注已保存");
+          }}
+        />
+      )}
+      {previewing && selected && (
         <Modal
-          title={parentId ? "添加图片切片" : "上传壁画素材"}
-          onClose={() => setShowForm(false)}
           wide
+          title={selected.filename}
+          onClose={() => setPreviewing(false)}
         >
-          <form className="upload-form" onSubmit={submit}>
-            <p className="modal-caption">
-              {parentId
-                ? `关联到 ${items.find((item) => item.id === parentId)?.filename || "当前图片"}`
-                : "选择洞窟与区域，再上传 JPG、PNG 或 WebP 图片，单张不超过 20 MB。"}
-            </p>
-            <label className="upload-drop">
-              <ImagePlus size={28} />
-              <strong>{file ? file.name : "选择图像文件"}</strong>
-              <span>
-                {file
-                  ? `${(file.size / 1024 / 1024).toFixed(2)} MB`
-                  : "点击选择本地图片"}
-              </span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(event) => {
-                  setFile(event.target.files?.[0] || null);
-                  setError("");
-                }}
-                required
-              />
-            </label>
-            {!parentId && (
-              <div className="upload-form-grid">
-                <label>
-                  所属洞窟
-                  <input
-                    value={fields.cave}
-                    onChange={(event) => change("cave", event.target.value)}
-                    placeholder="例如：第 17 窟"
-                    maxLength={100}
-                    required
-                  />
-                </label>
-                <label>
-                  所属区域
-                  <input
-                    value={fields.mural}
-                    onChange={(event) => change("mural", event.target.value)}
-                    placeholder="例如：西壁"
-                    maxLength={100}
-                    required
-                  />
-                </label>
-              </div>
-            )}
-            <label>
-              图像来源
-              <input
-                value={fields.source}
-                onChange={(event) => change("source", event.target.value)}
-                placeholder="填写采集或资料来源"
-                maxLength={300}
-                required
-              />
-            </label>
-            <label>
-              备注
-              <textarea
-                value={fields.note}
-                onChange={(event) => change("note", event.target.value)}
-                placeholder="可补充采集时间或图像说明"
-                maxLength={1000}
-                rows={3}
-              />
-            </label>
-            {error && (
-              <p className="upload-error" role="alert">
-                {error}
-              </p>
-            )}
-            <div className="modal-actions">
-              <button type="button" onClick={() => setShowForm(false)}>
-                取消
-              </button>
-              <button className="primary" type="submit" disabled={busy}>
-                {busy ? "正在上传…" : "保存素材"}
-              </button>
-            </div>
-          </form>
+          <div className="upload-preview">
+            <img
+              src={selected.imageUrl}
+              alt={`${selected.cave} ${selected.mural}`}
+            />
+          </div>
         </Modal>
+      )}
+      {deleting && selected && (
+        <Modal
+          title="确认删除素材"
+          onClose={() => !mutation.current && setDeleting(false)}
+        >
+          <p className="modal-caption">
+            删除“{selected.filename}”及其 {children.length}{" "}
+            张切片？此操作无法撤销。
+          </p>
+          {operationError && (
+            <p className="upload-error" role="alert">
+              {operationError}
+            </p>
+          )}
+          <div className="modal-actions">
+            <button disabled={actionBusy} onClick={() => setDeleting(false)}>
+              取消
+            </button>
+            <button
+              className="primary"
+              disabled={actionBusy}
+              onClick={deleteSelected}
+            >
+              {actionBusy ? "正在删除…" : "确认删除"}
+            </button>
+          </div>
+        </Modal>
+      )}
+      {showForm && (
+        <UploadDialog
+          cave={scopeCave}
+          parent={items.find((item) => item.id === parentId)}
+          pool={{
+            ...pool,
+            tags: [
+              ...new Set([
+                ...pool.tags,
+                ...items.flatMap((item) => item.tags || []),
+              ]),
+            ],
+          }}
+          onClose={() => setShowForm(false)}
+          onSaved={(asset) => setItems((old) => [asset, ...old])}
+          onCompleted={(asset) => {
+            setQuery("");
+            setFilters({ sort: "recent" });
+            onUploaded(asset);
+            setMessage("所选图片已保存到素材池");
+          }}
+        />
       )}
     </>
   );
