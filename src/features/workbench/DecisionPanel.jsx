@@ -10,6 +10,7 @@ export default function DecisionPanel({
   hasRisk,
   setCandidate,
   updateDraft,
+  reviewer,
 }) {
   return (
     <Panel
@@ -41,9 +42,8 @@ export default function DecisionPanel({
       <input
         id="reviewer"
         aria-label="复核人"
-        value={draft.reviewer}
-        onChange={(e) => updateDraft({ reviewer: e.target.value })}
-        placeholder="填写姓名或组内代号"
+        value={reviewer}
+        readOnly
       />
       <label className="field-label" htmlFor="decision">
         复核结论
@@ -53,6 +53,7 @@ export default function DecisionPanel({
         value={draft.decision}
         onChange={(e) => updateDraft({ decision: e.target.value })}
       >
+        <option value="" disabled>请选择复核结论</option>
         {Object.entries(decisionLabels).map(([key, label]) => (
           <option key={key} value={key} disabled={key === "approve" && hasRisk}>
             {label}

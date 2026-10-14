@@ -1,27 +1,61 @@
 import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { Layers, ChevronDown } from "lucide-react";
+import { Layers, LogOut } from "lucide-react";
 import Workbench from "./features/workbench/Workbench.jsx";
-import Placeholder from "./pages/Placeholder.jsx";
+import AuthPage from "./pages/AuthPage.jsx";
+import HomePage from "./pages/HomePage.jsx";
+import AssetsPage from "./pages/AssetsPage.jsx";
+import ReviewPage from "./pages/ReviewPage.jsx";
+import SettingsPage from "./pages/SettingsPage.jsx";
+import { authApi } from "./services/authApi.js";
 import "./styles.css";
+import "./pages/pages.css";
 const routes = {
   home: "首页",
   assets: "素材池",
   workbench: "工作台",
-  review: "审核",
+  review: "复核记录",
   settings: "设置",
 };
 function App() {
   const readRoute = () => {
-    const key = location.hash.slice(2);
-    return routes[key] ? key : "workbench";
+    const key = location.hash.slice(2).split("?")[0];
+    return routes[key] ? key : "home";
   };
   const [page, setPage] = useState(readRoute);
+  const [user, setUser] = useState(undefined);
+  const [logoutError, setLogoutError] = useState("");
+  useEffect(() => {
+    let live = true;
+    authApi.me().then(({ user: current }) => {
+      if (live) setUser(current);
+    }).catch(() => {
+      if (live) setUser(null);
+    });
+    const onUnauthorized = () => setUser(null);
+    window.addEventListener("glads-auth-required", onUnauthorized);
+    return () => {
+      live = false;
+      window.removeEventListener("glads-auth-required", onUnauthorized);
+    };
+  }, []);
   useEffect(() => {
     const onHash = () => setPage(readRoute());
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+  async function logout() {
+    setLogoutError("");
+    try {
+      await authApi.logout();
+      setUser(null);
+      location.hash = "#/login";
+    } catch (error) {
+      setLogoutError(error.message);
+    }
+  }
+  if (user === undefined) return <div className="service-state">正在载入工作台…</div>;
+  if (!user) return <AuthPage onAuthenticated={setUser} />;
   return (
     <>
       <header className="app-header">
@@ -49,16 +83,21 @@ function App() {
           ))}
         </nav>
         <div className="user-chip">
-          <span className="avatar">研</span>
+          <span className="avatar">{user.displayName.slice(0, 1)}</span>
           <div>
-            项目研究组<small>Golden20 复核</small>
+            {user.displayName}<small>项目成员</small>
           </div>
+          <button className="header-logout" aria-label="退出登录" title="退出登录" onClick={logout}><LogOut size={16} /></button>
+          {logoutError && <span role="alert">{logoutError}</span>}
         </div>
       </header>
       <div hidden={page !== "workbench"}>
-        <Workbench />
+        <Workbench active={page === "workbench"} user={user} />
       </div>
-      {page !== "workbench" && <Placeholder title={routes[page]} />}
+      {page === "home" && <HomePage />}
+      {page === "assets" && <AssetsPage />}
+      {page === "review" && <ReviewPage />}
+      {page === "settings" && <SettingsPage user={user} onUserChanged={setUser} />}
     </>
   );
 }

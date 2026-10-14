@@ -179,6 +179,8 @@ nav a.active span {
   gap: 10px;
   font-size: 11px;
 }
+.header-logout { color: #dcc9b5; border-color: #806657; margin-left: 6px; padding: 8px; }
+.header-logout:hover:not(:disabled) { color: #fff; background: #674537; border-color: #9a715a; }
 .user-chip small {
   display: block;
   color: #b1a294;

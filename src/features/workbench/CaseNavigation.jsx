@@ -35,7 +35,7 @@ export default function CaseNavigation({
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         >
-          {["全部", "待复核", "已复核", "高风险"].map((v) => (
+          {["全部", "待处理", "已有判断", "高风险"].map((v) => (
             <option key={v}>{v}</option>
           ))}
         </select>
@@ -59,8 +59,8 @@ export default function CaseNavigation({
         </div>
         <div className="file-footer">
           <FileImage size={14} />
-          {cases.length} 个真实参考案例 ·{" "}
-          {cases.filter((c) => c.latestReview).length} 个已复核
+          {cases.length} 个案例 ·{" "}
+          {cases.filter((c) => c.latestReview).length} 个已有判断
         </div>
       </Panel>
       <Panel
@@ -74,7 +74,7 @@ export default function CaseNavigation({
             {cases.filter((c) => c.latestReview).length}
             <small> / {cases.length}</small>
           </strong>
-          <span>已人工复核</span>
+          <span>已有判断记录</span>
         </div>
         <div className="progress-track">
           <span
@@ -96,7 +96,7 @@ export default function CaseNavigation({
           ))}
         </div>
         <p className="tiny">
-          这是本组 20 例参考案例的复核进度，不代表洞窟整体修复完成。
+          按案例查看人工复核进度。
         </p>
       </Panel>
     </aside>

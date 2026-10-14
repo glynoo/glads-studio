@@ -14,6 +14,10 @@ async function request(path, options = {}) {
   } catch {
     throw new Error(`服务响应无法读取（${response.status}）`);
   }
+  if (response.status === 401) {
+    window.dispatchEvent(new Event("glads-auth-required"));
+    throw new Error("登录已失效，请重新登录");
+  }
   if (!response.ok)
     throw new Error(body.error || `服务请求失败（${response.status}）`);
   return body;
@@ -33,4 +37,25 @@ export const reviewApi = {
       body: JSON.stringify(value),
     }),
   exportUrl: "/api/export.zip",
+  listUploads: () => request("/api/uploads"),
+  listMyUploads: () => request("/api/my-uploads"),
+  confirmUpload: (id, confirmed) => request(`/api/uploads/${encodeURIComponent(id)}/confirmation`, {
+    method: "POST",
+    body: JSON.stringify({ confirmed }),
+  }),
+  upload: async (formData) => {
+    let response;
+    try {
+      response = await fetch("/api/uploads", { method: "POST", body: formData });
+    } catch {
+      throw new Error("上传失败，请检查本地服务");
+    }
+    const body = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      window.dispatchEvent(new Event("glads-auth-required"));
+      throw new Error("登录已失效，请重新登录");
+    }
+    if (!response.ok) throw new Error(body.error || "上传失败，请重试");
+    return body;
+  },
 };
